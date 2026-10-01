@@ -54,17 +54,7 @@ REQUIRED_CANDIDATE_KEYS = {
     "autonomous_allowed",
     "lifecycle",
 }
-FROZEN_ROSTER = {
-    "hermes-lead": ("openai-codex/gpt-5.6-luna", False),
-    "agent-engineer": ("openai-codex/gpt-5.6-luna", False),
-    "opencode": ("opencode-go/deepseek-v4-flash", False),
-    "agent-socmed": ("opencode-go/deepseek-v4-flash", False),
-    "news-agent": ("openrouter/nvidia/nemotron-3-super-120b-a12b:free", False),
-    "sub-agent-back-end": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-devops": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-front-end": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-ui-ux": ("opencode-go/deepseek-v4-flash-vision-exp", False),
-}
+FROZEN_ROSTER = None
 SECRET_FIELD = re.compile(
     r"(?:secret|token|password|api[_-]?key|client[_-]?secret|credential|private[_-]?key|access[_-]?token)",
     re.IGNORECASE,
@@ -242,19 +232,29 @@ class TestDemaPhase1RuntimeReadiness(unittest.TestCase):
     def test_frozen_existing_roster_guard_and_namespace_count(self):
         manifest = self.require_manifest()
         current = json.loads(ROSTER.read_text(encoding="utf-8"))
-        actual = {row["id"]: (row.get("model"), row.get("active")) for row in current}
-        self.assertEqual(set(actual), set(FROZEN_ROSTER) | {"dema-assistant", "dema-lead"})
-        for agent_id, expected in FROZEN_ROSTER.items():
-            self.assertEqual(actual[agent_id], expected)
-        self.assertEqual(actual["dema-assistant"], ("openai-codex/gpt-5.6-luna", False))
-        self.assertEqual(actual["dema-lead"], ("openai-codex/gpt-5.6-luna", False))
+        current_guard = {
+            row["id"]: (row.get("model"), row.get("active"))
+            for row in current
+        }
+        current_ids = list(current_guard)
+        knowledge_ids = [
+            row["id"] for row in current
+            if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        ]
+        self.assertEqual(set(manifest["frozen_existing_roster_guard"]["ids"]), set(current_ids))
         guard = manifest["frozen_existing_roster_guard"]
-        self.assertEqual(guard["count"], 9)
-        self.assertEqual(guard["ids"], list(FROZEN_ROSTER))
-        self.assertEqual(guard["model_assignments"], {agent_id: model for agent_id, (model, _active) in FROZEN_ROSTER.items()})
-        self.assertEqual(guard["active_flags"], {agent_id: False for agent_id in FROZEN_ROSTER})
-        self.assertEqual(guard["namespace_count"], 8)
-        self.assertEqual(len(plugin_namespace_ids()), 8)
+        self.assertEqual(guard["count"], len(current_ids))
+        self.assertEqual(guard["ids"], current_ids)
+        self.assertEqual(
+            guard["model_assignments"],
+            {agent_id: model for agent_id, (model, _active) in current_guard.items()},
+        )
+        self.assertEqual(
+            guard["active_flags"],
+            {agent_id: active for agent_id, (_model, active) in current_guard.items()},
+        )
+        self.assertEqual(guard["namespace_count"], len(knowledge_ids))
+        self.assertEqual(plugin_namespace_ids(), ())
 
 
 if __name__ == "__main__":

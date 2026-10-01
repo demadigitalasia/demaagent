@@ -18,17 +18,21 @@ SCRIPTS = Path("/opt/data/scripts")
 PYTHON = Path("/opt/hermes/.venv/bin/python")
 LAUNCHER = SCRIPTS / "mission_control_runtime_launcher.py"
 PROBE = SCRIPTS / "mission_control_runtime_probe.py"
+ROSTER = PROJECT / "agents.json"
 TEST_SECRET = b"launcher-test-secret-0123456789-abcdef"
-AGENT_IDS = (
-    "hermes-lead",
-    "agent-engineer",
-    "agent-socmed",
-    "news-agent",
-    "sub-agent-back-end",
-    "sub-agent-devops",
-    "sub-agent-front-end",
-    "sub-agent-ui-ux",
-)
+
+
+def current_knowledge_agent_ids():
+    rows = json.loads(ROSTER.read_text(encoding="utf-8"))
+    return tuple(sorted(
+        row["id"] for row in rows
+        if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        and row.get("id") != "opencode"
+    ))
+
+
+AGENT_IDS = current_knowledge_agent_ids()
+PRIMARY_AGENT_ID = AGENT_IDS[0]
 
 
 def _decode_b64url(value: str) -> bytes:
@@ -221,7 +225,7 @@ class RuntimeLauncherTests(unittest.TestCase):
 
     def test_non_knowledge_roster_agent_is_rejected(self):
         class FakePlugin:
-            OBSIDIAN_AGENT_IDS = ("knowledge-agent", "nonknowledge-agent")
+            OBSIDIAN_AGENT_IDS = ()
 
             @staticmethod
             def _load_agents():

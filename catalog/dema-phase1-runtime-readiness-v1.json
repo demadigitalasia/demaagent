@@ -412,41 +412,47 @@
     "notes": "This recommendation does not create runtime identities and must receive a separate rollout approval before any provisioning decision."
   },
   "frozen_existing_roster_guard": {
-    "count": 9,
+    "count": 11,
     "ids": [
       "hermes-lead",
       "agent-engineer",
-      "opencode",
-      "agent-socmed",
-      "news-agent",
-      "sub-agent-back-end",
-      "sub-agent-devops",
-      "sub-agent-front-end",
-      "sub-agent-ui-ux"
+      "backend-data",
+      "frontend-product-ui",
+      "devops-sre",
+      "personal-assistant",
+      "finance-assistant",
+      "document-knowledge",
+      "social-research-trends",
+      "content-planner-copywriter",
+      "visual-ugc-designer"
     ],
     "model_assignments": {
-      "hermes-lead": "openai-codex/gpt-5.6-luna",
+      "hermes-lead": "openrouter/openai/gpt-6.1-sol-pro",
       "agent-engineer": "openai-codex/gpt-5.6-luna",
-      "opencode": "opencode-go/deepseek-v4-flash",
-      "agent-socmed": "opencode-go/deepseek-v4-flash",
-      "news-agent": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
-      "sub-agent-back-end": "opencode-go/deepseek-v4-flash",
-      "sub-agent-devops": "opencode-go/deepseek-v4-flash",
-      "sub-agent-front-end": "opencode-go/deepseek-v4-flash",
-      "sub-agent-ui-ux": "opencode-go/deepseek-v4-flash-vision-exp"
+      "backend-data": "opencode-go/deepseek-v4-flash",
+      "frontend-product-ui": "openai-codex/gpt-6-luna",
+      "devops-sre": "openai-codex/gpt-5.6-luna",
+      "personal-assistant": "openai-codex/gpt-5.6-luna",
+      "finance-assistant": "openai-codex/gpt-5.6-luna",
+      "document-knowledge": "opencode-go/deepseek-v4-flash",
+      "social-research-trends": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "content-planner-copywriter": "opencode-go/deepseek-v4-flash",
+      "visual-ugc-designer": "opencode-go/deepseek-v4-flash-vision-exp"
     },
     "active_flags": {
       "hermes-lead": false,
       "agent-engineer": false,
-      "opencode": false,
-      "agent-socmed": false,
-      "news-agent": false,
-      "sub-agent-back-end": false,
-      "sub-agent-devops": false,
-      "sub-agent-front-end": false,
-      "sub-agent-ui-ux": false
+      "backend-data": false,
+      "frontend-product-ui": false,
+      "devops-sre": false,
+      "personal-assistant": false,
+      "finance-assistant": false,
+      "document-knowledge": false,
+      "social-research-trends": false,
+      "content-planner-copywriter": false,
+      "visual-ugc-designer": false
     },
-    "namespace_count": 8,
+    "namespace_count": 6,
     "status": "guard_only_not_mutated"
   }
 }

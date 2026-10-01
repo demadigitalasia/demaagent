@@ -26,7 +26,7 @@ Proposal ini mencakup delapan kandidat:
 - Lifecycle eksplisit: semua kandidat berhenti di `design_candidate`; `configured`, `tested`, `on_demand_ready`, `approved_for_users`, dan `active` semuanya `false`.
 - Dependencies dan acceptance gates untuk provider/model selection, persona contract, tool contract, knowledge boundary, tenant isolation, bounded smoke, cost/quota, audit, dan human approval.
 - Recommendation-only runtime roster yang tidak diprovisionkan.
-- Guard roster existing: sembilan ID, model literal, semua `active=false`, dan delapan namespace.
+- Guard roster existing: seluruh ID roster aktif dari `agents.json`, literal model, semua `active=false`, dan namespace knowledge yang dihitung dari skill `obsidian` + `llm-wiki`.
 - Focused tests ditulis sebelum artifact untuk membuktikan RED lalu GREEN.
 
 ## Bukan provisioning

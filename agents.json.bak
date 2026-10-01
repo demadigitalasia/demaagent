@@ -300,7 +300,7 @@
     "name": "Frontend & Product UI",
     "role": "Frontend/Product UI Engineer — React, state, responsive UI, dan accessibility",
     "persona": "Spesialis UI React/Vite/Tailwind yang terhubung API nyata, responsive, accessible, dan konsisten dengan design system.",
-    "model": "openrouter/openai/gpt-6.1-sol",
+    "model": "openai-codex/gpt-6.1-sol",
     "helper_models": [],
     "skills": [
       "claude-design",

@@ -1,0 +1,501 @@
+{
+  "default_workflow": "assistant-general",
+  "routing_rules": [
+    {
+      "capability": "engineering-specialist",
+      "id": "code-task",
+      "keywords": [
+        "code",
+        "coding",
+        "api",
+        "backend",
+        "frontend",
+        "bug",
+        "test"
+      ],
+      "priority": 90
+    },
+    {
+      "capability": "research",
+      "id": "research-task",
+      "keywords": [
+        "research",
+        "source",
+        "trend",
+        "compare",
+        "citation"
+      ],
+      "priority": 80
+    },
+    {
+      "capability": "content",
+      "id": "content-task",
+      "keywords": [
+        "content",
+        "copy",
+        "script",
+        "social",
+        "campaign"
+      ],
+      "priority": 80
+    },
+    {
+      "capability": "document",
+      "id": "document-task",
+      "keywords": [
+        "document",
+        "report",
+        "proposal",
+        "brief"
+      ],
+      "priority": 70
+    },
+    {
+      "capability": "finance",
+      "id": "finance-task",
+      "keywords": [
+        "finance",
+        "budget",
+        "invoice",
+        "forecast",
+        "cost"
+      ],
+      "priority": 70
+    },
+    {
+      "capability": "assistant",
+      "id": "assistant-task",
+      "keywords": [
+        "remind",
+        "schedule",
+        "organize",
+        "draft"
+      ],
+      "priority": 50
+    },
+    {
+      "capability": "code-execution",
+      "id": "executor-concept",
+      "keywords": [
+        "implement",
+        "patch",
+        "execute"
+      ],
+      "priority": 40
+    }
+  ],
+  "version": 1,
+  "workflows": [
+    {
+      "approval_gates": [
+        "external_write"
+      ],
+      "capabilities": [
+        "engineering-specialist"
+      ],
+      "id": "coding-pipeline",
+      "keywords": [
+        "code",
+        "coding",
+        "api",
+        "backend",
+        "frontend",
+        "bug",
+        "implement",
+        "patch"
+      ],
+      "name": "Coding pipeline",
+      "priority": 90,
+      "stages": [
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "coordination"
+          ],
+          "depends_on": [],
+          "exclude_tags": [],
+          "id": "lead-intake",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "lead"
+          },
+          "name": "Hermes intake"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "engineering-planning"
+          ],
+          "depends_on": [
+            "lead-intake"
+          ],
+          "exclude_tags": [],
+          "id": "engineering-plan",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "planner"
+          },
+          "name": "Engineering plan"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "engineering-specialist"
+          ],
+          "depends_on": [
+            "engineering-plan"
+          ],
+          "exclude_tags": [
+            "planner",
+            "lead",
+            "executor-only"
+          ],
+          "id": "specialist",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Capability-selected engineering specialist"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "code-execution"
+          ],
+          "depends_on": [
+            "specialist"
+          ],
+          "exclude_tags": [],
+          "executor_ref": "executor:opencode",
+          "id": "executor",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "executor_only"
+          },
+          "name": "OpenCode executor-only stage",
+          "runtime_mode": "executor_only"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "verification"
+          ],
+          "depends_on": [
+            "executor"
+          ],
+          "exclude_tags": [
+            "lead"
+          ],
+          "id": "verification",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "planner"
+          },
+          "name": "Verification"
+        }
+      ]
+    },
+    {
+      "approval_gates": [
+        "publish"
+      ],
+      "capabilities": [
+        "content"
+      ],
+      "id": "content-pipeline",
+      "keywords": [
+        "content",
+        "copy",
+        "script",
+        "social",
+        "campaign"
+      ],
+      "name": "Content pipeline",
+      "priority": 80,
+      "stages": [
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "content-research"
+          ],
+          "depends_on": [],
+          "exclude_tags": [],
+          "id": "research",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Research"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "content"
+          ],
+          "depends_on": [
+            "research"
+          ],
+          "exclude_tags": [],
+          "id": "content",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Content draft"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "visual"
+          ],
+          "depends_on": [
+            "content"
+          ],
+          "exclude_tags": [],
+          "id": "visual",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Visual direction"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "approval-review"
+          ],
+          "depends_on": [
+            "visual"
+          ],
+          "exclude_tags": [
+            "specialist",
+            "content",
+            "visual"
+          ],
+          "id": "approval",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "lead"
+          },
+          "name": "Owner approval"
+        }
+      ]
+    },
+    {
+      "approval_gates": [
+        "external_write"
+      ],
+      "capabilities": [
+        "document"
+      ],
+      "id": "document-workflow",
+      "keywords": [
+        "document",
+        "report",
+        "proposal",
+        "brief",
+        "knowledge"
+      ],
+      "name": "Document and knowledge workflow",
+      "priority": 70,
+      "stages": [
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "research"
+          ],
+          "depends_on": [],
+          "exclude_tags": [],
+          "id": "research",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Document research"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "document"
+          ],
+          "depends_on": [
+            "research"
+          ],
+          "exclude_tags": [],
+          "id": "document",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Document draft"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "approval-review"
+          ],
+          "depends_on": [
+            "document"
+          ],
+          "exclude_tags": [
+            "specialist",
+            "content",
+            "visual"
+          ],
+          "id": "approval",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "lead"
+          },
+          "name": "Owner approval"
+        }
+      ]
+    },
+    {
+      "approval_gates": [
+        "external_write",
+        "delete"
+      ],
+      "capabilities": [
+        "finance"
+      ],
+      "id": "finance-workflow",
+      "keywords": [
+        "finance",
+        "budget",
+        "invoice",
+        "forecast",
+        "cost"
+      ],
+      "name": "Finance workflow",
+      "priority": 70,
+      "stages": [
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "finance",
+            "analysis"
+          ],
+          "depends_on": [],
+          "exclude_tags": [],
+          "id": "analysis",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Finance analysis"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "document"
+          ],
+          "depends_on": [
+            "analysis"
+          ],
+          "exclude_tags": [
+            "research"
+          ],
+          "id": "document",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Finance brief"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "approval-review"
+          ],
+          "depends_on": [
+            "document"
+          ],
+          "exclude_tags": [
+            "specialist",
+            "content",
+            "visual"
+          ],
+          "id": "approval",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "lead"
+          },
+          "name": "Owner approval"
+        }
+      ]
+    },
+    {
+      "approval_gates": [
+        "external_write"
+      ],
+      "capabilities": [
+        "assistant"
+      ],
+      "id": "assistant-general",
+      "keywords": [
+        "remind",
+        "schedule",
+        "organize",
+        "draft",
+        "help"
+      ],
+      "name": "Assistant workflow",
+      "priority": 50,
+      "stages": [
+        {
+          "allow_self_loop": false,
+          "approval": "lead_review",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "assistant"
+          ],
+          "depends_on": [],
+          "exclude_tags": [
+            "lead"
+          ],
+          "id": "assist",
+          "keywords": [],
+          "metadata_filters": {},
+          "name": "Assistant"
+        },
+        {
+          "allow_self_loop": false,
+          "approval": "approval_required",
+          "candidate_agent_ids": [],
+          "capabilities": [
+            "approval-review"
+          ],
+          "depends_on": [
+            "assist"
+          ],
+          "exclude_tags": [
+            "specialist",
+            "content",
+            "visual"
+          ],
+          "id": "review",
+          "keywords": [],
+          "metadata_filters": {
+            "runtime_mode": "lead"
+          },
+          "name": "Owner review"
+        }
+      ]
+    }
+  ]
+}

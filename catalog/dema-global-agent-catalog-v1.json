@@ -353,17 +353,17 @@
       "id": "dema-social",
       "display_name": "DEMA Social",
       "kind": "domain_agent",
-      "runtime_owner": "agent-socmed",
+      "runtime_owner": "content-planner-copywriter",
       "provisioning": "recommendation_only_not_provisioned",
-      "reason": "Maps the product capability to the existing social runtime."
+      "reason": "Maps the catalog capability to the current roster owner; no runtime is provisioned."
     },
     {
       "id": "dema-research",
       "display_name": "Research",
       "kind": "workflow",
-      "runtime_owner": "news-agent",
+      "runtime_owner": "social-research-trends",
       "provisioning": "recommendation_only_not_provisioned",
-      "reason": "Keeps research as a workflow over the existing briefing runtime."
+      "reason": "Maps the catalog capability to the current roster owner; no runtime is provisioned."
     },
     {
       "id": "dema-business-workflows",
@@ -375,30 +375,34 @@
     }
   ],
   "frozen_runtime_guard": {
-    "count": 9,
+    "count": 11,
     "ids": [
       "hermes-lead",
       "agent-engineer",
-      "opencode",
-      "agent-socmed",
-      "news-agent",
-      "sub-agent-back-end",
-      "sub-agent-devops",
-      "sub-agent-front-end",
-      "sub-agent-ui-ux"
+      "backend-data",
+      "frontend-product-ui",
+      "devops-sre",
+      "personal-assistant",
+      "finance-assistant",
+      "document-knowledge",
+      "social-research-trends",
+      "content-planner-copywriter",
+      "visual-ugc-designer"
     ],
     "active_flags": {
       "hermes-lead": false,
       "agent-engineer": false,
-      "opencode": false,
-      "agent-socmed": false,
-      "news-agent": false,
-      "sub-agent-back-end": false,
-      "sub-agent-devops": false,
-      "sub-agent-front-end": false,
-      "sub-agent-ui-ux": false
+      "backend-data": false,
+      "frontend-product-ui": false,
+      "devops-sre": false,
+      "personal-assistant": false,
+      "finance-assistant": false,
+      "document-knowledge": false,
+      "social-research-trends": false,
+      "content-planner-copywriter": false,
+      "visual-ugc-designer": false
     },
-    "namespace_count": 8
+    "namespace_count": 6
   },
   "boundary": {
     "catalog_is_not_runtime_count": true,
@@ -461,7 +465,7 @@
       "autonomous_allowed": false,
       "status": "existing_runtime_frozen",
       "notes": "Entity runtime existing; bukan katalog bisnis baru dan tetap on-demand.",
-      "runtime_owner_reason": "Self-owned coordinator row in the frozen nine-entity runtime roster."
+      "runtime_owner_reason": "Self-owned coordinator row in the current roster configuration."
     },
     {
       "id": "agent-engineer",
@@ -552,188 +556,405 @@
       "runtime_owner_reason": "Self-owned executor row in the frozen runtime roster."
     },
     {
-      "id": "sub-agent-back-end",
-      "display_name": "Sub Agent Back End",
+      "id": "backend-data",
+      "display_name": "Backend & Data",
       "kind": "platform_internal",
-      "domain": "platform-backend",
-      "purpose": "Spesialis backend di bawah Agent Engineer untuk API, database, validasi, dan testing.",
+      "domain": "engineering-specialist",
+      "purpose": "Backend/API/Data Engineer — server, database, integrasi, dan validasi",
       "primary_inputs": [
-        "backend_task",
-        "repository_context",
-        "test_contract"
+        "engineering-task",
+        "api",
+        "database"
       ],
       "primary_outputs": [
-        "backend_change",
-        "focused_tests",
-        "regression_report"
+        "patch",
+        "tests",
+        "api-contract"
       ],
-      "runtime_owner": "sub-agent-back-end",
+      "runtime_owner": "hermes-lead",
       "parent": "agent-engineer",
       "visibility": "platform_internal",
-      "default_mode": "on_demand_delegated",
+      "default_mode": "on_demand_specialist",
       "provider_model_policy": {
         "source": "current_roster_metadata",
         "selection": "preserve_literal_provider_model",
         "fallback": "none",
-        "execution": "bounded_task_only"
+        "execution": "existing_runtime_only"
       },
       "skills": [
         "test-driven-development",
         "systematic-debugging",
-        "mission-control"
+        "codebase-inspection",
+        "requesting-code-review",
+        "spike",
+        "github",
+        "mission-control",
+        "obsidian",
+        "llm-wiki"
       ],
-      "tools": [
-        "repository_read",
-        "api_test_runner",
-        "database_read"
-      ],
+      "tools": [],
       "knowledge_scope": [
         "10-Wiki",
-        "30-Agents/sub-agent-back-end"
+        "30-Agents/backend-data"
       ],
       "approval_required": true,
       "autonomous_allowed": false,
       "status": "existing_runtime_frozen",
-      "notes": "Internal implementation specialist; bukan public catalog entry.",
-      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
     },
     {
-      "id": "sub-agent-devops",
-      "display_name": "Sub Agent DevOps",
+      "id": "frontend-product-ui",
+      "display_name": "Frontend & Product UI",
       "kind": "platform_internal",
-      "domain": "platform-operations",
-      "purpose": "Spesialis infrastructure, deployment, monitoring, dan server di bawah Agent Engineer.",
+      "domain": "engineering-specialist",
+      "purpose": "Frontend/Product UI Engineer — React, state, responsive UI, dan accessibility",
       "primary_inputs": [
-        "infrastructure_task",
-        "deployment_context",
-        "verification_contract"
+        "engineering-task",
+        "ui",
+        "accessibility"
       ],
       "primary_outputs": [
-        "operations_change",
-        "health_evidence",
-        "rollback_signal"
+        "ui-patch",
+        "build",
+        "review"
       ],
-      "runtime_owner": "sub-agent-devops",
+      "runtime_owner": "hermes-lead",
       "parent": "agent-engineer",
       "visibility": "platform_internal",
-      "default_mode": "on_demand_delegated",
+      "default_mode": "on_demand_specialist",
       "provider_model_policy": {
         "source": "current_roster_metadata",
         "selection": "preserve_literal_provider_model",
         "fallback": "none",
-        "execution": "bounded_task_only"
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "claude-design",
+        "popular-web-designs",
+        "design-md",
+        "dogfood",
+        "mission-control",
+        "codebase-inspection",
+        "spike",
+        "obsidian",
+        "llm-wiki"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/frontend-product-ui"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "devops-sre",
+      "display_name": "DevOps & SRE",
+      "kind": "platform_internal",
+      "domain": "engineering-specialist",
+      "purpose": "DevOps/SRE — deployment, CI/CD, monitoring, backup, dan reliability",
+      "primary_inputs": [
+        "engineering-task",
+        "reliability",
+        "deployment-review"
+      ],
+      "primary_outputs": [
+        "runbook",
+        "test",
+        "health-evidence"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
       },
       "skills": [
         "coolify",
+        "github",
+        "github-release-binary-install",
         "mission-control",
-        "github-release-binary-install"
+        "codebase-inspection",
+        "systematic-debugging"
       ],
-      "tools": [
-        "health_probe",
-        "deployment_read",
-        "log_read"
-      ],
+      "tools": [],
       "knowledge_scope": [
-        "10-Wiki",
-        "30-Agents/sub-agent-devops"
+        "10-Wiki"
       ],
       "approval_required": true,
       "autonomous_allowed": false,
       "status": "existing_runtime_frozen",
-      "notes": "Internal operations specialist; tidak membuat scheduler atau runtime baru dari katalog ini.",
-      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
     },
     {
-      "id": "sub-agent-front-end",
-      "display_name": "Sub Agent Front End",
+      "id": "personal-assistant",
+      "display_name": "Personal Assistant",
       "kind": "platform_internal",
-      "domain": "platform-frontend",
-      "purpose": "Spesialis React/Vite/Tailwind, state API, responsive UI, dan accessibility di bawah Agent Engineer.",
+      "domain": "assistant",
+      "purpose": "Personal Assistant — agenda, task intake, prioritas, dan daily planning",
       "primary_inputs": [
-        "frontend_task",
-        "existing_ui_pattern",
-        "acceptance_criteria"
+        "request",
+        "reminder",
+        "document"
       ],
       "primary_outputs": [
-        "frontend_change",
-        "build_evidence",
-        "ui_regression_report"
+        "brief",
+        "draft",
+        "schedule-proposal"
       ],
-      "runtime_owner": "sub-agent-front-end",
-      "parent": "agent-engineer",
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
       "visibility": "platform_internal",
-      "default_mode": "on_demand_delegated",
+      "default_mode": "on_demand_assistant",
       "provider_model_policy": {
         "source": "current_roster_metadata",
         "selection": "preserve_literal_provider_model",
         "fallback": "none",
-        "execution": "bounded_task_only"
+        "execution": "existing_runtime_only"
       },
       "skills": [
-        "mission-control",
-        "dogfood",
-        "design-md"
+        "google-workspace",
+        "email-inbox-triage",
+        "docx",
+        "pdf",
+        "xlsx"
       ],
-      "tools": [
-        "frontend_build",
-        "dom_read",
-        "browser_probe"
-      ],
+      "tools": [],
       "knowledge_scope": [
-        "10-Wiki",
-        "30-Agents/sub-agent-front-end"
+        "10-Wiki"
       ],
       "approval_required": true,
       "autonomous_allowed": false,
       "status": "existing_runtime_frozen",
-      "notes": "Internal frontend specialist; catalog v1 tidak menyentuh UI.",
-      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
     },
     {
-      "id": "sub-agent-ui-ux",
-      "display_name": "Sub Agent UI UX",
+      "id": "finance-assistant",
+      "display_name": "Finance Assistant",
       "kind": "platform_internal",
-      "domain": "platform-design",
-      "purpose": "Spesialis design system, layout, mobile-first, accessibility, dan usability di bawah Agent Engineer.",
+      "domain": "finance",
+      "purpose": "Finance Assistant — budgeting, expense tracking, cashflow, dan reporting",
       "primary_inputs": [
-        "design_task",
-        "existing_design_pattern",
-        "responsive_acceptance_criteria"
+        "finance-task",
+        "document"
       ],
       "primary_outputs": [
-        "design_guidance",
-        "ui_review",
-        "accessibility_findings"
+        "analysis",
+        "table",
+        "approval-brief"
       ],
-      "runtime_owner": "sub-agent-ui-ux",
-      "parent": "agent-engineer",
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
       "visibility": "platform_internal",
-      "default_mode": "on_demand_delegated",
+      "default_mode": "on_demand_specialist",
       "provider_model_policy": {
         "source": "current_roster_metadata",
         "selection": "preserve_literal_provider_model",
         "fallback": "none",
-        "execution": "bounded_task_only"
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "xlsx",
+        "google-workspace",
+        "docx",
+        "pdf",
+        "grounded-citations"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "document-knowledge",
+      "display_name": "Document & Knowledge",
+      "kind": "platform_internal",
+      "domain": "research",
+      "purpose": "Document/Knowledge Assistant — dokumen, SOP, meeting notes, dan proposal wiki",
+      "primary_inputs": [
+        "research-task",
+        "document"
+      ],
+      "primary_outputs": [
+        "summary",
+        "document-draft",
+        "citations"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "docx",
+        "pdf",
+        "xlsx",
+        "obsidian",
+        "llm-wiki",
+        "grounded-citations",
+        "google-workspace"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/document-knowledge"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "social-research-trends",
+      "display_name": "Social Research & Trends",
+      "kind": "platform_internal",
+      "domain": "research",
+      "purpose": "Social Research — trend, competitor, audience, dan content intelligence",
+      "primary_inputs": [
+        "research-task",
+        "trend-scan"
+      ],
+      "primary_outputs": [
+        "research-brief",
+        "sources",
+        "trend-summary"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "competitor-news-monitor",
+        "grounded-citations",
+        "youtube-content",
+        "arxiv",
+        "obsidian",
+        "llm-wiki"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/social-research-trends"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "content-planner-copywriter",
+      "display_name": "Content Planner & Copywriter",
+      "kind": "platform_internal",
+      "domain": "content",
+      "purpose": "Content Planner — calendar, brief, copy, script, dan repurposing",
+      "primary_inputs": [
+        "content-task",
+        "brief"
+      ],
+      "primary_outputs": [
+        "draft",
+        "script",
+        "content-plan"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "dema-social-content",
+        "youtube-content",
+        "humanizer",
+        "grounded-citations",
+        "obsidian",
+        "llm-wiki"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/content-planner-copywriter"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "visual-ugc-designer",
+      "display_name": "Visual & UGC Designer",
+      "kind": "platform_internal",
+      "domain": "visual",
+      "purpose": "Visual/UGC Designer — creative direction, storyboard, design system, dan asset brief",
+      "primary_inputs": [
+        "content-task",
+        "visual-brief"
+      ],
+      "primary_outputs": [
+        "storyboard",
+        "asset-brief",
+        "design-review"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
       },
       "skills": [
         "claude-design",
         "design-md",
-        "popular-web-designs"
+        "popular-web-designs",
+        "dogfood",
+        "youtube-content",
+        "dema-social-content"
       ],
-      "tools": [
-        "design_review",
-        "browser_probe",
-        "accessibility_read"
-      ],
+      "tools": [],
       "knowledge_scope": [
-        "10-Wiki",
-        "30-Agents/sub-agent-ui-ux"
+        "10-Wiki"
       ],
       "approval_required": true,
       "autonomous_allowed": false,
       "status": "existing_runtime_frozen",
-      "notes": "Internal design specialist; tidak menjadi public/business runtime.",
-      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+      "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
+      "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
     },
     {
       "id": "dema-assistant",
@@ -1020,7 +1241,7 @@
         "content_draft",
         "approval_handoff"
       ],
-      "runtime_owner": "agent-socmed",
+      "runtime_owner": "content-planner-copywriter",
       "parent": "dema-lead",
       "visibility": "public_catalog",
       "default_mode": "approval_gated_on_demand",
@@ -1048,7 +1269,7 @@
       "autonomous_allowed": false,
       "status": "catalog_only_recommended",
       "notes": "Alias sumber Social dipetakan eksplisit; posting tetap di luar scope katalog v1.",
-      "runtime_owner_reason": "Existing agent-socmed is the only current runtime owner for the social capability."
+      "runtime_owner_reason": "Existing content-planner-copywriter is the only current runtime owner for the social capability."
     },
     {
       "id": "dema-content",
@@ -1740,7 +1961,7 @@
         "source_list",
         "cited_synthesis"
       ],
-      "runtime_owner": "news-agent",
+      "runtime_owner": "social-research-trends",
       "parent": "dema-analyst",
       "visibility": "public_workflow",
       "default_mode": "approval_gated_workflow",
@@ -1767,8 +1988,8 @@
       "approval_required": true,
       "autonomous_allowed": false,
       "status": "catalog_only_recommended",
-      "notes": "Mapped to existing news-agent; tidak mengaktifkan jadwal riset baru.",
-      "runtime_owner_reason": "Existing news-agent is the only current runtime owner for research workflow."
+      "notes": "Mapped to existing social-research-trends; tidak mengaktifkan jadwal riset baru.",
+      "runtime_owner_reason": "Existing social-research-trends is the only current runtime owner for research workflow."
     },
     {
       "id": "dema-retention",

@@ -22,23 +22,23 @@ Tidak ada nama yang dihilangkan diam-diam. `source_mappings` menyimpan setiap pa
 
 ## Pemisahan boundary
 
-- `platform_internal` terdiri dari tujuh entity existing: `hermes-lead`, `agent-engineer`, `opencode`, `sub-agent-back-end`, `sub-agent-devops`, `sub-agent-front-end`, dan `sub-agent-ui-ux`.
+- `platform_internal` terdiri dari entity roster aktif yang dibaca dari `agents.json` ditambah boundary executor OpenCode: Hermes Lead, Agent Engineer, specialist/assistant agents saat ini, dan OpenCode sebagai executor-only. Daftar ini tidak boleh diduplikasi sebagai tuple otorisasi di source code.
 - Public/business catalog terdiri dari `DEMA Assistant`, `DEMA Lead`, serta domain functions seperti Support, Sales, CRM, Marketing, Social, Content, Analyst, Finance, Document, Operations, Inventory, Procurement, HR, Project, dan Commerce.
 - Workflow catalog dipisahkan dari domain agent untuk Order, Booking, Recruiter, Meeting, Email, Research, Retention, Review, dan Report.
 - Setiap entry memiliki metadata eksplisit: identity, kind, domain, purpose, input/output contract, single `runtime_owner`, parent, visibility, execution mode, provider policy, skills, tools, knowledge scope, approval boundary, autonomous flag, status, dan notes.
 
 ## Runtime owner dan rekomendasi roster
 
-Setiap entry memiliki tepat satu `runtime_owner` string dan `runtime_owner_reason`. Shared ownership oleh `hermes-lead` adalah keputusan arsitektur yang disengaja untuk catalog-only business functions yang belum memiliki runtime product khusus. Social memakai `agent-socmed`; Research memakai `news-agent`; platform rows mempertahankan self-owner existing.
+Setiap entry memiliki tepat satu `runtime_owner` string dan `runtime_owner_reason`. Shared ownership oleh `hermes-lead` adalah keputusan arsitektur yang disengaja untuk catalog-only business functions yang belum memiliki runtime product khusus. Social memakai owner roster `content-planner-copywriter`; Research memakai `social-research-trends`; platform rows mempertahankan self-owner metadata dan OpenCode tetap executor-only.
 
 `recommended_runtime_roster` hanya rekomendasi top-level: `dema-assistant`, `dema-lead`, `dema-social`, `dema-research`, dan shared business workflows. Semua record ditandai `recommendation_only_not_provisioned` dan tidak ditulis ke roster aktif.
 
 ## Yang benar-benar diimplementasikan
 
-- Manifest JSON v1 yang dapat diparse dengan 33 catalog entries dan 39 source mappings.
+- Manifest JSON v1 yang dapat diparse dengan 38 catalog entries dan 39 source mappings.
 - Union coverage test untuk seluruh nama dari kedua sumber desain.
 - Schema/metadata, uniqueness, platform/business separation, single-owner reasoning, no-secret/no-absolute-path, dan roster non-mutation tests.
-- Frozen runtime guard untuk 9 roster IDs, literal model assignments, seluruh `active=false`, dan namespace count 8.
+- Frozen runtime guard untuk roster aktif saat ini, seluruh active flags dari konfigurasi, dan namespace count yang dihitung dari skill `obsidian` + `llm-wiki`; OpenCode tidak diberi namespace.
 - Dokumentasi boundary bahwa jumlah produk/workflow yang terlihat user tidak sama dengan jumlah proses runtime.
 
 ## Yang masih berupa rekomendasi/keputusan produk

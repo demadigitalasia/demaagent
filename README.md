@@ -84,11 +84,9 @@ absolut) dan memount-nya di prefix `/api` → endpoint sama seperti plugin:
 
 `/opt/data/scripts/mission_control_runtime_launcher.py` adalah utilitas lokal
 control-plane untuk menjalankan satu command eksplisit dengan token runtime
-sementara. Launcher sekarang mengizinkan seluruh delapan namespace knowledge-
-capable kanonik (`hermes-lead`, `agent-engineer`, `agent-socmed`, `news-agent`,
-`sub-agent-back-end`, `sub-agent-devops`, `sub-agent-front-end`, dan
-`sub-agent-ui-ux`). Allowlist diturunkan dari `OBSIDIAN_AGENT_IDS`, lalu tetap
-memeriksa roster dan skill `obsidian` + `llm-wiki`; `opencode`, ID tidak dikenal,
+sementara. Allowlist diturunkan saat runtime dari roster aktif dan agent yang
+memiliki skill `obsidian` + `llm-wiki`; simbol `OBSIDIAN_AGENT_IDS` hanya
+kompatibilitas import dan bukan sumber otorisasi. `opencode`, ID tidak dikenal,
 dan agent roster yang bukan knowledge-capable selalu ditolak. Launcher tidak
 membuat format token baru.
 
@@ -96,7 +94,7 @@ Contoh bounded probe:
 
 ```bash
 /opt/data/scripts/mission_control_runtime_launcher.py \
-  --agent-id agent-engineer \
+  --agent-id <current-knowledge-agent-id> \
   --base-url http://127.0.0.1:9120 \
   --ttl 300 \
   -- /opt/hermes/.venv/bin/python /opt/data/scripts/mission_control_runtime_probe.py
@@ -137,9 +135,10 @@ agent sendiri, shared `10-Wiki`, serta proposal-only write sesuai ACL. Rollout
 allowlist ini tidak menjadwalkan atau meluncurkan agent secara otomatis; cron,
 profile, roster, scheduler, dan autonomous runtime tetap tidak berubah.
 
-**Pilot status (2026-10-01):** allowlist launcher diperluas ke delapan namespace
-knowledge-capable dengan rejection eksplisit untuk `opencode`, ID tidak dikenal,
-dan roster non-knowledge. Token runtime kini memiliki claim `refresh_until`
+**Pilot status (2026-10-01):** allowlist launcher dihitung saat runtime dari seluruh
+agent roster yang memiliki skill `obsidian` + `llm-wiki`, dengan rejection eksplisit
+untuk `opencode`, ID tidak dikenal, dan roster non-knowledge. Token runtime kini
+memiliki claim `refresh_until`
 dengan batas absolut 24 jam; `/runtime-api/auth/refresh` mempertahankan identity/scope,
 menolak token legacy/revoked/expired, dan tidak memberi owner privilege. Client
 stdlib melakukan rotasi in-memory dengan retry satu kali; probe refresh hanya
@@ -187,6 +186,18 @@ Roster model references are preserved literally as `provider/model`, including m
 ## Roster status and readiness semantics
 
 `active` remains a backward-compatible configuration flag; `configured_active` is its explicit name. Runtime evidence is separate in `live_status`, `live_detail`, `live_sessions`, and `live_source_status`; `standby`/`unknown` are not claims that a process is running. Model readiness is catalog-based: `provider_catalog_available` reports provider membership, `model_catalog_available`/`model_available` require an exact model ID, and `provider_connected` is only populated when the catalog exposes explicit authentication evidence. The legacy `model_connected` field now means exact catalog match only; it is not a live network or process probe. `GET /api/agents/roster` only reads state; workspace provisioning/reconciliation remains on the explicit workspace route.
+
+## Workflow and Obsidian readiness gates
+
+Mission Control reports these states separately; none of them launches an agent:
+
+- **Drive workspace ready**: persisted folder metadata exists and reads back. This is storage metadata, not runtime readiness or write permission.
+- **Obsidian namespace ready**: the owner-approved private namespace directory and bounded `README.md` marker read back successfully. The current approved slice is exactly `hermes-lead`, `document-knowledge`, `social-research-trends`, and `content-planner-copywriter`; initialization is idempotent through `POST /api/obsidian/agent-workspaces/initialize` with the normal owner session and CSRF protection.
+- **Runtime-ready**: `false` for this gate. No agent runtime, autonomous adapter, cron, or scheduler is activated.
+- **Approved**: workflow stages remain approval-gated (`lead_review`, `approval_required`, and external-write/publish gates). Namespace initialization does not approve an agent for end users or external writes; private writes remain proposal-only.
+- **Live**: `false`; roster `active=false` and route preview evidence is configuration-only (`launched=false`, `external_writes=false`).
+
+The runtime/owner knowledge ACL is derived from current roster skills `obsidian` + `llm-wiki`, excludes OpenCode and legacy IDs, and does not infer authorization from a directory that happens to exist. Backend/Data and Frontend/Product UI remain ACL-eligible by skill metadata where applicable but are not provisioned in this namespace slice. Workflow stage selection uses capability plus validated metadata filters such as `runtime_mode=lead` or `runtime_mode=planner`; it does not require ordinary candidate-agent ID lists.
 
 ## Start / Stop
 

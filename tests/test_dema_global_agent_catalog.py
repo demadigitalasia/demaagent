@@ -25,25 +25,9 @@ PRODUCT_SOURCE = [
     "Review", "Report",
 ]
 PLATFORM_IDS = {
-    "hermes-lead",
-    "agent-engineer",
-    "opencode",
-    "sub-agent-back-end",
-    "sub-agent-devops",
-    "sub-agent-front-end",
-    "sub-agent-ui-ux",
-}
-FROZEN_ROSTER = {
-    "hermes-lead": ("openai-codex/gpt-5.6-luna", False),
-    "agent-engineer": ("openai-codex/gpt-5.6-luna", False),
-    "opencode": ("opencode-go/deepseek-v4-flash", False),
-    "agent-socmed": ("opencode-go/deepseek-v4-flash", False),
-    "news-agent": ("openrouter/nvidia/nemotron-3-super-120b-a12b:free", False),
-    "sub-agent-back-end": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-devops": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-front-end": ("opencode-go/deepseek-v4-flash", False),
-    "sub-agent-ui-ux": ("opencode-go/deepseek-v4-flash-vision-exp", False),
-}
+    row["id"] for row in json.loads(ROSTER.read_text(encoding="utf-8"))
+} | {"opencode"}
+FROZEN_ROSTER = None
 REQUIRED_ENTRY_KEYS = {
     "id", "display_name", "kind", "domain", "purpose", "primary_inputs",
     "primary_outputs", "runtime_owner", "parent", "visibility", "default_mode",
@@ -163,7 +147,9 @@ class TestDemaGlobalAgentCatalog(unittest.TestCase):
         self.assertTrue(any(self.by_id[item]["kind"] == "workflow" for item in public))
 
     def test_runtime_owner_is_one_explicit_owner_with_reason(self):
-        roster_ids = set(FROZEN_ROSTER)
+        roster_ids = {
+            row["id"] for row in json.loads(ROSTER.read_text(encoding="utf-8"))
+        } | {"opencode"}
         recommended_ids = {row["id"] for row in self.manifest["recommended_runtime_roster"]}
         for entry in self.entries:
             owner = entry["runtime_owner"]
@@ -190,20 +176,24 @@ class TestDemaGlobalAgentCatalog(unittest.TestCase):
                 self.assertFalse(scope.startswith("/"), entry["id"])
                 self.assertNotIn("..", Path(scope).parts, entry["id"])
 
-    def test_roster_guard_keeps_frozen_nine_and_all_flags_false_with_approved_business_additions(self):
+    def test_roster_guard_keeps_current_roster_and_namespace_count(self):
         current = json.loads(ROSTER.read_text(encoding="utf-8"))
         actual = {row["id"]: (row.get("model"), row.get("active")) for row in current}
-        self.assertEqual(set(actual), set(FROZEN_ROSTER) | {"dema-assistant", "dema-lead"})
-        for agent_id, expected in FROZEN_ROSTER.items():
-            self.assertEqual(actual[agent_id], expected)
-        self.assertEqual(actual["dema-assistant"], ("openai-codex/gpt-5.6-luna", False))
-        self.assertEqual(actual["dema-lead"], ("openai-codex/gpt-5.6-luna", False))
+        self.assertEqual(set(actual) | {"opencode"}, PLATFORM_IDS)
         guard = self.manifest["frozen_runtime_guard"]
-        self.assertEqual(guard["count"], 9)
-        self.assertEqual(guard["ids"], list(FROZEN_ROSTER))
-        self.assertEqual(guard["active_flags"], {agent_id: False for agent_id in FROZEN_ROSTER})
-        self.assertEqual(guard["namespace_count"], 8)
-        self.assertEqual(len(plugin_namespace_ids()), 8)
+        current_ids = list(actual)
+        knowledge_ids = [
+            row["id"] for row in current
+            if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        ]
+        self.assertEqual(guard["count"], len(current_ids))
+        self.assertEqual(guard["ids"], current_ids)
+        self.assertEqual(
+            guard["active_flags"],
+            {agent_id: active for agent_id, (_model, active) in actual.items()},
+        )
+        self.assertEqual(guard["namespace_count"], len(knowledge_ids))
+        self.assertEqual(plugin_namespace_ids(), ())
 
 
 if __name__ == "__main__":

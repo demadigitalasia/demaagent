@@ -6,16 +6,21 @@ from pathlib import Path
 
 
 PLUGIN = Path("/opt/data/plugins/mission-control/dashboard/plugin_api.py")
-AGENT_IDS = (
-    "hermes-lead",
-    "agent-engineer",
-    "agent-socmed",
-    "news-agent",
-    "sub-agent-back-end",
-    "sub-agent-devops",
-    "sub-agent-front-end",
-    "sub-agent-ui-ux",
-)
+ROSTER = Path("/opt/data/mission-control/agents.json")
+
+
+def current_knowledge_agent_ids():
+    rows = json.loads(ROSTER.read_text(encoding="utf-8"))
+    return tuple(sorted(
+        row["id"] for row in rows
+        if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        and row.get("id") != "opencode"
+    ))
+
+
+AGENT_IDS = current_knowledge_agent_ids()
+PRIMARY_AGENT_ID = AGENT_IDS[0]
+SECONDARY_AGENT_ID = AGENT_IDS[1]
 
 
 def response_json(value):
@@ -55,16 +60,16 @@ class TestAgentWorkspaceTemporaryVault(unittest.TestCase):
                 f"---\nagent_id: {agent_id}\nscope: private\n---\n# {agent_id}\n\n[[10-Wiki/index]]\n",
                 encoding="utf-8",
             )
-        (self.root / "30-Agents/hermes-lead/private.md").write_text(
-            "# Private\nonly hermes-lead\n", encoding="utf-8"
+        primary_folder = self.root / "30-Agents" / PRIMARY_AGENT_ID
+        secondary_folder = self.root / "30-Agents" / SECONDARY_AGENT_ID
+        (primary_folder / "private.md").write_text(
+            f"# Private\nonly {PRIMARY_AGENT_ID}\n", encoding="utf-8"
         )
-        (self.root / "30-Agents/agent-engineer/private.md").write_text(
+        (secondary_folder / "private.md").write_text(
             "# Other Private\nmust not cross scope\n", encoding="utf-8"
         )
         try:
-            (self.root / "30-Agents/hermes-lead/symlink.md").symlink_to(
-                self.root / "30-Agents/agent-engineer/private.md"
-            )
+            (primary_folder / "symlink.md").symlink_to(secondary_folder / "private.md")
         except OSError:
             self.skipTest("symlink not supported by test filesystem")
         self.roster = [{"id": agent_id, "name": agent_id, "role": "test", "skills": ["obsidian", "llm-wiki"]}
@@ -82,10 +87,12 @@ class TestAgentWorkspaceTemporaryVault(unittest.TestCase):
     def test_namespace_creation_and_readback_are_bounded(self):
         status, body = response_json(self.module.obsidian_agent_workspaces())
         self.assertEqual(status, 200)
-        self.assertEqual(body["count"], 8)
+        self.assertEqual(body["count"], len(AGENT_IDS))
         self.assertEqual({row["agent_id"] for row in body["workspaces"]}, set(AGENT_IDS))
+        self.assertEqual(body["namespace_readiness"]["ready_count"], 4)
+        self.assertEqual(set(body["namespace_readiness"]["ready_agent_ids"]), set(self.module.OBSIDIAN_APPROVED_NAMESPACE_IDS))
         self.assertTrue(all(row["status"] == "ready" for row in body["workspaces"]))
-        status2, detail = response_json(self.module.obsidian_agent_workspace("hermes-lead"))
+        status2, detail = response_json(self.module.obsidian_agent_workspace(PRIMARY_AGENT_ID))
         self.assertEqual(status2, 200)
         self.assertIn("README.md", {row["workspace_relative_path"] for row in detail["workspace"]["notes"]})
         self.assertGreaterEqual(len(detail["shared_context"]), 3)
@@ -97,67 +104,67 @@ class TestAgentWorkspaceTemporaryVault(unittest.TestCase):
         status2, body2 = response_json(self.module.obsidian_agent_workspace("opencode"))
         self.assertEqual(status2, 403)
         self.assertIn("executor-only", body2["error"])
-        status3, body3 = response_json(self.module.obsidian_agent_workspace("hermes-lead\x00"))
+        status3, body3 = response_json(self.module.obsidian_agent_workspace(PRIMARY_AGENT_ID + "\x00"))
         self.assertEqual(status3, 400)
 
     def test_cross_agent_traversal_nul_backslash_core_and_raw_paths_rejected(self):
         rejected = [
-            "30-Agents/agent-engineer/private.md",
-            "../agent-engineer/private.md",
+            f"30-Agents/{SECONDARY_AGENT_ID}/private.md",
+            f"../{SECONDARY_AGENT_ID}/private.md",
             "nested/../../private.md",
             "nested\\private.md",
             "bad\x00.md",
-            "/opt/data/obsidian-vault/30-Agents/hermes-lead/README.md",
+            f"/opt/data/obsidian-vault/30-Agents/{PRIMARY_AGENT_ID}/README.md",
             "MEMORY.md",
             "USER.md",
             "00-Hermes/Memory Index.md",
         ]
         for raw in rejected:
-            status, body = response_json(self.module._agent_workspace_read("hermes-lead", raw))
+            status, body = response_json(self.module._agent_workspace_read(PRIMARY_AGENT_ID, raw))
             self.assertEqual(status, 400, raw)
             self.assertEqual(body["status"], "error")
 
     def test_symlink_and_cross_agent_reads_do_not_escape_scope(self):
-        status, _body = response_json(self.module._agent_workspace_read("hermes-lead", "symlink.md"))
+        status, _body = response_json(self.module._agent_workspace_read(PRIMARY_AGENT_ID, "symlink.md"))
         self.assertEqual(status, 404)
-        status2, _body2 = response_json(self.module._agent_workspace_read("hermes-lead", "30-Agents/agent-engineer/private.md"))
+        status2, _body2 = response_json(self.module._agent_workspace_read(PRIMARY_AGENT_ID, f"30-Agents/{SECONDARY_AGENT_ID}/private.md"))
         self.assertEqual(status2, 400)
 
     def test_shared_context_and_scoped_graph_include_only_private_plus_wiki(self):
-        status, detail = response_json(self.module.obsidian_agent_workspace("hermes-lead"))
+        status, detail = response_json(self.module.obsidian_agent_workspace(PRIMARY_AGENT_ID))
         self.assertEqual(status, 200)
         shared_paths = {row["relative_path"] for row in detail["shared_context"]}
         self.assertIn("10-Wiki/index.md", shared_paths)
-        status_read, shared_note = response_json(self.module._agent_workspace_read("hermes-lead", "10-Wiki/index.md"))
+        status_read, shared_note = response_json(self.module._agent_workspace_read(PRIMARY_AGENT_ID, "10-Wiki/index.md"))
         self.assertEqual(status_read, 200)
         self.assertEqual(shared_note["scope"], "shared_10_wiki")
-        status2, graph = response_json(self.module.obsidian_agent_workspace_graph("hermes-lead", path="README.md", depth=1, max_notes=40, max_bytes=60000))
+        status2, graph = response_json(self.module.obsidian_agent_workspace_graph(PRIMARY_AGENT_ID, path="README.md", depth=1, max_notes=40, max_bytes=60000))
         self.assertEqual(status2, 200)
         graph_paths = {row["relative_path"] for row in graph["notes"]}
-        self.assertIn("30-Agents/hermes-lead/README.md", graph_paths)
-        self.assertTrue(all(path.startswith("30-Agents/hermes-lead/") or path.startswith("10-Wiki/") for path in graph_paths))
-        self.assertNotIn("30-Agents/agent-engineer/private.md", graph_paths)
+        self.assertIn(f"30-Agents/{PRIMARY_AGENT_ID}/README.md", graph_paths)
+        self.assertTrue(all(path.startswith(f"30-Agents/{PRIMARY_AGENT_ID}/") or path.startswith("10-Wiki/") for path in graph_paths))
+        self.assertNotIn(f"30-Agents/{SECONDARY_AGENT_ID}/private.md", graph_paths)
 
     def test_list_and_graph_limits_are_bounded(self):
-        folder = self.root / "30-Agents/hermes-lead"
+        folder = self.root / "30-Agents" / PRIMARY_AGENT_ID
         for index in range(80):
             (folder / f"note-{index:02d}.md").write_text(f"# Note {index}\n", encoding="utf-8")
-        status, detail = response_json(self.module._agent_workspace_list("hermes-lead"))
+        status, detail = response_json(self.module._agent_workspace_list(PRIMARY_AGENT_ID))
         self.assertEqual(status, 200)
         self.assertLessEqual(len(detail["workspace"]["notes"]), 50)
-        status2, graph = response_json(self.module.obsidian_agent_workspace_graph("hermes-lead", path="README.md", max_notes=40, max_bytes=5000))
+        status2, graph = response_json(self.module.obsidian_agent_workspace_graph(PRIMARY_AGENT_ID, path="README.md", max_notes=40, max_bytes=5000))
         self.assertEqual(status2, 200)
         self.assertLessEqual(len(graph["notes"]), 40)
         self.assertLessEqual(graph["context"]["content_bytes"], 5000)
 
     def test_proposal_only_write_readback_and_no_secret_response(self):
         status, body = response_json(self.module._agent_workspace_proposal(
-            "hermes-lead", {"path": "notes/proposed.md", "title": "A proposal", "content": "review me"}
+            PRIMARY_AGENT_ID, {"path": "notes/proposed.md", "title": "A proposal", "content": "review me"}
         ))
         self.assertEqual(status, 200)
         self.assertFalse(body["private_note_written"])
         self.assertTrue(body["approval_required"])
-        target = self.root / "30-Agents/hermes-lead/notes/proposed.md"
+        target = self.root / "30-Agents" / PRIMARY_AGENT_ID / "notes/proposed.md"
         self.assertFalse(target.exists())
         proposal = self.root / body["proposal"]["relative_path"]
         self.assertTrue(proposal.is_file())
@@ -166,16 +173,108 @@ class TestAgentWorkspaceTemporaryVault(unittest.TestCase):
             self.assertNotIn(marker, encoded)
 
     def test_proposal_rejects_private_cross_scope_and_secret_content(self):
-        for raw in ("30-Agents/agent-engineer/new.md", "../new.md", "MEMORY.md", "new\\file.md"):
+        for raw in (f"30-Agents/{SECONDARY_AGENT_ID}/new.md", "../new.md", "MEMORY.md", "new\\file.md"):
             status, _body = response_json(self.module._agent_workspace_proposal(
-                "hermes-lead", {"path": raw, "content": "x"}
+                PRIMARY_AGENT_ID, {"path": raw, "content": "x"}
             ))
             self.assertEqual(status, 400, raw)
         status2, body2 = response_json(self.module._agent_workspace_proposal(
-            "hermes-lead", {"path": "secret.md", "content": "api_key: real-secret-value"}
+            PRIMARY_AGENT_ID, {"path": "secret.md", "content": "api_key: real-secret-value"}
         ))
         self.assertEqual(status2, 400)
         self.assertIn("credential", body2["error"])
+
+
+class TestApprovedNamespaceInitialization(unittest.TestCase):
+    APPROVED = {
+        "hermes-lead",
+        "document-knowledge",
+        "social-research-trends",
+        "content-planner-copywriter",
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("mission_control_namespace_init_test", PLUGIN)
+        cls.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.module)
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="mc-namespace-init-")
+        self.root = Path(self.tmp.name)
+        (self.root / "10-Wiki").mkdir(parents=True)
+        (self.root / "10-Wiki/index.md").write_text("# Shared index\n", encoding="utf-8")
+        (self.root / "10-Wiki/SCHEMA.md").write_text("# Schema\n", encoding="utf-8")
+        legacy = self.root / "30-Agents/agent-engineer"
+        legacy.mkdir(parents=True)
+        (legacy / "README.md").write_text("legacy marker\n", encoding="utf-8")
+        hermes = self.root / "30-Agents/hermes-lead"
+        hermes.mkdir(parents=True)
+        (hermes / "README.md").write_text("existing approved marker\n", encoding="utf-8")
+        self.core_before = {
+            path: path.read_bytes()
+            for path in (self.root / "10-Wiki/index.md", self.root / "10-Wiki/SCHEMA.md")
+        }
+        self.roster = [
+            {"id": agent_id, "name": agent_id, "skills": ["obsidian", "llm-wiki"]}
+            for agent_id in sorted(self.APPROVED | {"backend-data", "frontend-product-ui"})
+        ]
+        self.roster.append({"id": "agent-engineer", "name": "Agent Engineer", "skills": ["mission-control"]})
+        self.original_root = self.module._obsidian_root
+        self.original_loader = self.module._load_agents
+        self.module._obsidian_root = lambda: (self.root, "test-vault")
+        self.module._load_agents = lambda: self.roster
+
+    def tearDown(self):
+        self.module._obsidian_root = self.original_root
+        self.module._load_agents = self.original_loader
+        self.tmp.cleanup()
+
+    def test_initialization_is_exact_idempotent_and_does_not_expand_acl_or_touch_core(self):
+        first = self.module.initialize_approved_agent_namespaces()
+        self.assertEqual(first["status"], "ok")
+        self.assertEqual(set(first["agent_ids"]), self.APPROVED)
+        self.assertEqual(set(first["created_agent_ids"]), self.APPROVED - {"hermes-lead"})
+        self.assertEqual(first["already_ready_agent_ids"], ["hermes-lead"])
+        self.assertEqual(first["readback"]["verified"], True)
+        self.assertEqual(self.module._knowledge_agent_ids(), self.APPROVED | {"backend-data", "frontend-product-ui"})
+
+        folders = {path.name for path in (self.root / "30-Agents").iterdir() if path.is_dir()}
+        self.assertEqual(folders, self.APPROVED | {"agent-engineer"})
+        for agent_id in self.APPROVED - {"hermes-lead"}:
+            marker = self.root / "30-Agents" / agent_id / "README.md"
+            self.assertTrue(marker.is_file())
+            self.assertIn("write_mode: proposal_only", marker.read_text(encoding="utf-8"))
+        self.assertEqual(
+            (self.root / "30-Agents/hermes-lead/README.md").read_text(encoding="utf-8"),
+            "existing approved marker\n",
+        )
+        self.assertEqual((self.root / "30-Agents/agent-engineer/README.md").read_text(encoding="utf-8"), "legacy marker\n")
+        self.assertEqual({path: path.read_bytes() for path in self.core_before}, self.core_before)
+
+        snapshot = {
+            path: path.read_bytes()
+            for path in (self.root / "30-Agents").rglob("README.md")
+        }
+        second = self.module.initialize_approved_agent_namespaces()
+        self.assertEqual(second["status"], "ok")
+        self.assertEqual(second["created_agent_ids"], [])
+        self.assertEqual(second["already_ready_agent_ids"], sorted(self.APPROVED))
+        self.assertEqual(
+            {path: path.read_bytes() for path in (self.root / "30-Agents").rglob("README.md")},
+            snapshot,
+        )
+        encoded = json.dumps({"first": first, "second": second}, ensure_ascii=False).lower()
+        for marker in ("api_key", "access_token", "password", "client_secret", "/opt/data/"):
+            self.assertNotIn(marker, encoded)
+
+    def test_initialization_rejects_non_approved_or_non_knowledge_agents(self):
+        for invalid in (["backend-data"], [1]):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    self.module.initialize_approved_agent_namespaces(invalid)
+        with self.assertRaises(ValueError):
+            self.module.initialize_approved_agent_namespaces(["agent-engineer"])
 
 
 if __name__ == "__main__":

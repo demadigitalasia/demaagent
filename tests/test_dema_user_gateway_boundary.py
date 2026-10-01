@@ -269,9 +269,11 @@ class TestDemaUserGatewayBoundary(unittest.TestCase):
         roster_before = ROSTER.read_bytes()
         phase1 = json.loads(phase1_before.decode("utf-8"))
         roster = json.loads(roster_before.decode("utf-8"))
-        self.assertEqual(len(roster), 11)
-        self.assertFalse(next(row for row in roster if row["id"] == "dema-assistant")["active"])
-        self.assertFalse(next(row for row in roster if row["id"] == "dema-lead")["active"])
+        self.assertEqual(len(roster), len({row["id"] for row in roster}))
+        self.assertNotIn("dema-assistant", {row["id"] for row in roster})
+        self.assertNotIn("dema-lead", {row["id"] for row in roster})
+        for row in roster:
+            self.assertIs(row.get("active"), False, row["id"])
         for entry in phase1["candidate_entries"]:
             lifecycle = entry["lifecycle"]
             for flag in ("configured", "tested", "on_demand_ready", "approved_for_users", "active"):

@@ -19,16 +19,20 @@ from starlette.testclient import TestClient
 PROJECT = Path("/opt/data/mission-control")
 PLUGIN_PATH = Path("/opt/data/plugins/mission-control/dashboard/plugin_api.py")
 CLIENT_PATH = Path("/opt/data/scripts/mission_control_runtime_client.py")
-AGENT_IDS = (
-    "hermes-lead",
-    "agent-engineer",
-    "agent-socmed",
-    "news-agent",
-    "sub-agent-back-end",
-    "sub-agent-devops",
-    "sub-agent-front-end",
-    "sub-agent-ui-ux",
-)
+ROSTER_PATH = PROJECT / "agents.json"
+
+
+def current_knowledge_agent_ids():
+    rows = json.loads(ROSTER_PATH.read_text(encoding="utf-8"))
+    return tuple(sorted(
+        row["id"] for row in rows
+        if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        and row.get("id") != "opencode"
+    ))
+
+
+AGENT_IDS = current_knowledge_agent_ids()
+PRIMARY_AGENT_ID = AGENT_IDS[0]
 TEST_SECRET = "runtime-refresh-test-secret-0123456789"
 
 
@@ -111,7 +115,7 @@ class RuntimeRefreshAclTests(unittest.TestCase):
     def _owner_headers(self):
         return {"X-CSRF-Token": self.client.cookies.get("mc_csrf")}
 
-    def _mint(self, agent_id="agent-engineer", scopes=None, ttl_s=900):
+    def _mint(self, agent_id=PRIMARY_AGENT_ID, scopes=None, ttl_s=900):
         self._login()
         payload = {"agent_id": agent_id, "ttl_s": ttl_s}
         if scopes is not None:
@@ -140,14 +144,14 @@ class RuntimeRefreshAclTests(unittest.TestCase):
     def test_encoder_and_owner_mint_add_bounded_absolute_refresh_claim(self):
         now = 1_000
         token = self.plugin.encode_runtime_token(
-            "agent-engineer", scopes=["workspace:read"], ttl_s=60, now=now, jti="claim-test"
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=60, now=now, jti="claim-test"
         )
         claims = self.plugin.decode_runtime_token(token, now=now + 1)
         self.assertEqual(claims["refresh_until"], now + self.plugin.RUNTIME_TOKEN_MAX_REFRESH_S)
         self.assertLessEqual(claims["exp"], claims["refresh_until"])
         self.assertIsNone(self.plugin.decode_runtime_token(token, now=claims["refresh_until"]))
 
-        minted = self._mint("agent-engineer", ["workspace:read"], ttl_s=60)
+        minted = self._mint(PRIMARY_AGENT_ID, ["workspace:read"], ttl_s=60)
         self.assertIn("refresh_until", minted)
         self.assertIsInstance(minted["refresh_until_epoch"], int)
         self.assertEqual(
@@ -176,7 +180,7 @@ class RuntimeRefreshAclTests(unittest.TestCase):
         anonymous.close()
 
         minted = self._mint(
-            "agent-engineer", ["workspace:read", "proposal:create"], ttl_s=900
+            PRIMARY_AGENT_ID, ["workspace:read", "proposal:create"], ttl_s=900
         )
         old_claims = self.plugin.decode_runtime_token(minted["token"])
         response = self.client.post(
@@ -186,7 +190,7 @@ class RuntimeRefreshAclTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
         self.assertNotEqual(body["token"], minted["token"])
-        self.assertEqual(body["agent_id"], "agent-engineer")
+        self.assertEqual(body["agent_id"], PRIMARY_AGENT_ID)
         self.assertEqual(body["scopes"], ["proposal:create", "workspace:read"])
         self.assertEqual(body["refresh_until_epoch"], old_claims["refresh_until"])
         self.assertFalse(body["owner_privileges"])
@@ -202,11 +206,11 @@ class RuntimeRefreshAclTests(unittest.TestCase):
         )
         self.assertEqual(old_request.status_code, 200, old_request.text)
         self.assertEqual(new_request.status_code, 200, new_request.text)
-        self.assertEqual(new_request.json()["runtime_identity"]["agent_id"], "agent-engineer")
+        self.assertEqual(new_request.json()["runtime_identity"]["agent_id"], PRIMARY_AGENT_ID)
         self.assertEqual(new_request.json()["runtime_identity"]["scopes"], body["scopes"])
 
     def test_refresh_rejects_absolute_boundary_revocation_and_bad_signature(self):
-        minted = self._mint("agent-engineer", ["workspace:read"], ttl_s=900)
+        minted = self._mint(PRIMARY_AGENT_ID, ["workspace:read"], ttl_s=900)
         now = int(time.time())
         absolute_expired = self._resign(
             minted["token"],
@@ -239,7 +243,7 @@ class RuntimeRefreshAclTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_refresh_cannot_change_agent_or_upgrade_proposal_only_scope(self):
-        minted = self._mint("agent-engineer", ["proposal:create"], ttl_s=900)
+        minted = self._mint(PRIMARY_AGENT_ID, ["proposal:create"], ttl_s=900)
         response = self.client.post(
             "/runtime-api/auth/refresh",
             headers={"Authorization": f"Bearer {minted['token']}"},
@@ -247,7 +251,7 @@ class RuntimeRefreshAclTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
-        self.assertEqual(body["agent_id"], "agent-engineer")
+        self.assertEqual(body["agent_id"], PRIMARY_AGENT_ID)
         self.assertEqual(body["scopes"], ["proposal:create"])
         denied = self.client.get(
             "/runtime-api/obsidian/workspace",
@@ -271,11 +275,11 @@ class RuntimeClientTests(unittest.TestCase):
     def test_client_refreshes_in_memory_and_retries_once_without_files_or_token_output(self):
         now = int(time.time())
         old_token = self.plugin.encode_runtime_token(
-            "agent-engineer", scopes=["workspace:read"], ttl_s=300, now=now, jti="client-old"
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=300, now=now, jti="client-old"
         )
         old_claims = self.plugin.decode_runtime_token(old_token, now=now)
         new_token = self.plugin.encode_runtime_token(
-            "agent-engineer", scopes=["workspace:read"], ttl_s=300,
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=300,
             now=now, jti="client-new", refresh_until=old_claims["refresh_until"]
         )
         refreshed = {"count": 0}
@@ -289,7 +293,7 @@ class RuntimeClientTests(unittest.TestCase):
                     return
                 refreshed["count"] += 1
                 body = json.dumps({
-                    "status": "ok", "token": new_token, "agent_id": "agent-engineer",
+                    "status": "ok", "token": new_token, "agent_id": PRIMARY_AGENT_ID,
                     "scopes": ["workspace:read"],
                 }).encode("utf-8")
                 self.send_response(200)
@@ -305,7 +309,7 @@ class RuntimeClientTests(unittest.TestCase):
                     body = b'{"status":"unauthorized"}'
                     self.send_response(401)
                 else:
-                    body = b'{"status":"ok","runtime_identity":{"agent_id":"agent-engineer"}}'
+                    body = json.dumps({"status": "ok", "runtime_identity": {"agent_id": PRIMARY_AGENT_ID}}).encode("utf-8")
                     self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -324,7 +328,7 @@ class RuntimeClientTests(unittest.TestCase):
                 client = self.client_module.RuntimeClient(
                     base_url=f"http://127.0.0.1:{server.server_port}",
                     token=old_token,
-                    agent_id="agent-engineer",
+                    agent_id=PRIMARY_AGENT_ID,
                     expires_at=now + 1,
                     refresh_until=old_claims["refresh_until"],
                     safety_margin_s=30,
@@ -332,7 +336,7 @@ class RuntimeClientTests(unittest.TestCase):
                 response = client.request("/runtime-api/obsidian/workspace")
                 after = sorted(Path(cwd).rglob("*"))
                 self.assertEqual(response.status, 200)
-                self.assertEqual(json.loads(response.body)["runtime_identity"]["agent_id"], "agent-engineer")
+                self.assertEqual(json.loads(response.body)["runtime_identity"]["agent_id"], PRIMARY_AGENT_ID)
                 self.assertEqual(client.token, new_token)
                 self.assertEqual(refreshed["count"], 1)
                 self.assertEqual(requests["count"], 1)
@@ -347,11 +351,11 @@ class RuntimeClientTests(unittest.TestCase):
     def test_client_refreshes_after_single_401_and_does_not_loop(self):
         now = int(time.time())
         old_token = self.plugin.encode_runtime_token(
-            "agent-engineer", scopes=["workspace:read"], ttl_s=300, now=now, jti="retry-old"
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=300, now=now, jti="retry-old"
         )
         old_claims = self.plugin.decode_runtime_token(old_token, now=now)
         new_token = self.plugin.encode_runtime_token(
-            "agent-engineer", scopes=["workspace:read"], ttl_s=300,
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=300,
             now=now, jti="retry-new", refresh_until=old_claims["refresh_until"]
         )
         refresh_count = {"count": 0}
@@ -388,7 +392,7 @@ class RuntimeClientTests(unittest.TestCase):
             client = self.client_module.RuntimeClient(
                 base_url=f"http://127.0.0.1:{server.server_port}",
                 token=old_token,
-                agent_id="agent-engineer",
+                agent_id=PRIMARY_AGENT_ID,
                 expires_at=now + 300,
                 refresh_until=old_claims["refresh_until"],
                 safety_margin_s=1,

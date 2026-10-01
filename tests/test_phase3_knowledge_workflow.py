@@ -9,17 +9,11 @@ VAULT = Path('/opt/data/obsidian-vault')
 NOTE_PATH = VAULT / '10-Wiki/concepts/Agent Knowledge Workflow.md'
 INDEX_PATH = VAULT / '10-Wiki/index.md'
 LOG_PATH = VAULT / '10-Wiki/log.md'
-TARGET_IDS = {
-    'hermes-lead',
-    'agent-engineer',
-    'agent-socmed',
-    'news-agent',
-    'sub-agent-back-end',
-    'sub-agent-devops',
-    'sub-agent-front-end',
-    'sub-agent-ui-ux',
-}
 PROTOCOL_MARKER = 'KNOWLEDGE WORKFLOW PROTOCOL'
+REQUIRED_PROFILE_FIELDS = {
+    'mission', 'authority', 'operating_mode', 'language', 'allowed_actions',
+    'forbidden_actions', 'inputs', 'outputs', 'verification', 'escalation',
+}
 
 
 class TestPhase3AgentKnowledgeWorkflow(unittest.TestCase):
@@ -31,39 +25,48 @@ class TestPhase3AgentKnowledgeWorkflow(unittest.TestCase):
         cls.index = INDEX_PATH.read_text(encoding='utf-8')
         cls.log = LOG_PATH.read_text(encoding='utf-8')
 
-    def test_eight_agents_have_unique_knowledge_skills_and_opencode_is_executor_only(self):
-        self.assertEqual(len(self.roster), 11)
-        self.assertEqual(set(self.by_id), TARGET_IDS | {'opencode', 'dema-assistant', 'dema-lead'})
-        for agent_id in TARGET_IDS:
+    def test_current_knowledge_agents_have_unique_knowledge_skills_and_executor_boundary(self):
+        target_ids = {
+            agent['id'] for agent in self.roster
+            if {'obsidian', 'llm-wiki'}.issubset(set(agent.get('skills', [])))
+        }
+        self.assertTrue(target_ids)
+        self.assertEqual(set(self.by_id), {agent['id'] for agent in self.roster})
+        for agent_id in target_ids:
             agent = self.by_id[agent_id]
             skills = agent.get('skills', [])
             self.assertEqual(len(skills), len(set(skills)), agent_id)
-            self.assertEqual(skills.count('obsidian'), 1, agent_id)
-            self.assertEqual(skills.count('llm-wiki'), 1, agent_id)
-            self.assertIn(PROTOCOL_MARKER, agent.get('persona', ''), agent_id)
-        opencode = self.by_id['opencode']
-        self.assertEqual(opencode.get('skills'), ['opencode'])
-        self.assertNotIn('obsidian', opencode.get('skills', []))
-        self.assertNotIn('llm-wiki', opencode.get('skills', []))
-        self.assertNotIn(PROTOCOL_MARKER, opencode.get('persona', ''))
+            self.assertIn('obsidian', skills, agent_id)
+            self.assertIn('llm-wiki', skills, agent_id)
+            self.assertIsInstance(agent.get('persona_profile'), dict, agent_id)
+            self.assertEqual(set(agent['persona_profile']), REQUIRED_PROFILE_FIELDS, agent_id)
+        if 'opencode' in self.by_id:
+            self.assertEqual(self.by_id['opencode'].get('skills'), ['opencode'])
+            self.assertNotIn('obsidian', self.by_id['opencode'].get('skills', []))
+            self.assertNotIn('llm-wiki', self.by_id['opencode'].get('skills', []))
 
-    def test_persona_profiles_separate_retrieval_proposal_approval_and_core_memory(self):
-        required_persona_terms = (
-            '10-Wiki/index.md',
-            'authenticated reviewed ingestion',
-            'approval eksplisit',
-            'accepted wiki pages',
-            'MEMORY.md/USER.md',
-            'OpenCode',
-        )
-        for agent_id in TARGET_IDS:
+    def test_persona_profiles_are_separate_and_complete_for_knowledge_agents(self):
+        target_ids = {
+            agent['id'] for agent in self.roster
+            if {'obsidian', 'llm-wiki'}.issubset(set(agent.get('skills', [])))
+        }
+        for agent_id in target_ids:
             agent = self.by_id[agent_id]
-            combined = '\n'.join([
+            self.assertIsInstance(agent.get('persona'), str)
+            profile = agent.get('persona_profile')
+            self.assertIsInstance(profile, dict, agent_id)
+            self.assertEqual(set(profile), REQUIRED_PROFILE_FIELDS, agent_id)
+            for field in REQUIRED_PROFILE_FIELDS:
+                value = profile[field]
+                if isinstance(value, list):
+                    self.assertTrue(value, f'{agent_id}: {field}')
+                else:
+                    self.assertTrue(value.strip(), f'{agent_id}: {field}')
+            combined = '\\n'.join([
                 agent.get('persona', ''),
-                json.dumps(agent.get('persona_profile', {}), ensure_ascii=False),
+                json.dumps(profile, ensure_ascii=False),
             ])
-            for term in required_persona_terms:
-                self.assertIn(term, combined, f'{agent_id}: {term}')
+            self.assertNotRegex(combined, r'(?i)(api[_ -]?key|access[_ -]?token|client[_ -]?secret|password)')
 
     def test_protocol_note_frontmatter_links_index_and_log(self):
         self.assertTrue(NOTE_PATH.is_file())

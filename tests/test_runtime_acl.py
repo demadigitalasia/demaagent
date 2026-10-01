@@ -14,16 +14,21 @@ from starlette.testclient import TestClient
 
 PROJECT = Path("/opt/data/mission-control")
 SERVER_PATH = PROJECT / "server.py"
-AGENT_IDS = (
-    "hermes-lead",
-    "agent-engineer",
-    "agent-socmed",
-    "news-agent",
-    "sub-agent-back-end",
-    "sub-agent-devops",
-    "sub-agent-front-end",
-    "sub-agent-ui-ux",
-)
+ROSTER_PATH = PROJECT / "agents.json"
+
+
+def current_knowledge_agent_ids():
+    rows = json.loads(ROSTER_PATH.read_text(encoding="utf-8"))
+    return tuple(sorted(
+        row["id"] for row in rows
+        if {"obsidian", "llm-wiki"}.issubset(set(row.get("skills") or []))
+        and row.get("id") != "opencode"
+    ))
+
+
+AGENT_IDS = current_knowledge_agent_ids()
+PRIMARY_AGENT_ID = AGENT_IDS[0]
+SECONDARY_AGENT_ID = AGENT_IDS[1]
 
 
 class RuntimeAclTests(unittest.TestCase):
@@ -56,16 +61,16 @@ class RuntimeAclTests(unittest.TestCase):
                 f"---\nagent_id: {agent_id}\n---\n# {agent_id}\n",
                 encoding="utf-8",
             )
-        (self.root / "30-Agents/hermes-lead/private.md").write_text(
+        primary_folder = self.root / "30-Agents" / PRIMARY_AGENT_ID
+        secondary_folder = self.root / "30-Agents" / SECONDARY_AGENT_ID
+        (primary_folder / "private.md").write_text(
             "# Private A\n", encoding="utf-8"
         )
-        (self.root / "30-Agents/agent-engineer/private.md").write_text(
+        (secondary_folder / "private.md").write_text(
             "# Private B\n", encoding="utf-8"
         )
         try:
-            (self.root / "30-Agents/hermes-lead/symlink.md").symlink_to(
-                self.root / "30-Agents/agent-engineer/private.md"
-            )
+            (primary_folder / "symlink.md").symlink_to(secondary_folder / "private.md")
         except OSError:
             self.skipTest("symlink not supported")
         self.roster = [
@@ -111,7 +116,7 @@ class RuntimeAclTests(unittest.TestCase):
     def _owner_headers(self):
         return {"X-CSRF-Token": self.client.cookies.get("mc_csrf")}
 
-    def _mint(self, agent_id="hermes-lead", scopes=None, ttl_s=900):
+    def _mint(self, agent_id=PRIMARY_AGENT_ID, scopes=None, ttl_s=900):
         self._login()
         payload = {"agent_id": agent_id, "ttl_s": ttl_s}
         if scopes is not None:
@@ -140,11 +145,11 @@ class RuntimeAclTests(unittest.TestCase):
 
     def test_token_encode_decode_claims_and_tamper_expiry(self):
         token = self.plugin.encode_runtime_token(
-            "hermes-lead", scopes=["workspace:read"], ttl_s=60, now=1_000
+            PRIMARY_AGENT_ID, scopes=["workspace:read"], ttl_s=60, now=1_000
         )
         claims = self.plugin.decode_runtime_token(token, now=1_001)
-        self.assertEqual(claims["agent_id"], "hermes-lead")
-        self.assertEqual(claims["sub"], "hermes-lead")
+        self.assertEqual(claims["agent_id"], PRIMARY_AGENT_ID)
+        self.assertEqual(claims["sub"], PRIMARY_AGENT_ID)
         self.assertEqual(claims["iss"], self.plugin.RUNTIME_TOKEN_ISSUER)
         self.assertEqual(claims["aud"], self.plugin.RUNTIME_TOKEN_AUDIENCE)
         self.assertEqual(claims["scope"], ["workspace:read"])
@@ -160,12 +165,12 @@ class RuntimeAclTests(unittest.TestCase):
         with patch.dict(os.environ, {"MISSION_CONTROL_RUNTIME_TOKEN_SECRET": ""}, clear=False):
             self.assertIsNone(self.plugin.runtime_token_secret())
             with self.assertRaises(self.plugin.RuntimeTokenConfigurationError):
-                self.plugin.encode_runtime_token("hermes-lead", scopes=["workspace:read"])
+                self.plugin.encode_runtime_token(PRIMARY_AGENT_ID, scopes=["workspace:read"])
 
     def test_mint_revoke_and_runtime_auth_boundary(self):
         minted = self._mint()
         token = minted["token"]
-        self.assertEqual(minted["agent_id"], "hermes-lead")
+        self.assertEqual(minted["agent_id"], PRIMARY_AGENT_ID)
         self.assertIn("workspace:read", minted["scopes"])
         self.assertNotIn("token", json.dumps(minted.get("metadata", {})).lower())
 
@@ -177,15 +182,15 @@ class RuntimeAclTests(unittest.TestCase):
         )
         self.assertEqual(good.status_code, 200, good.text)
         body = good.json()
-        self.assertEqual(body["runtime_identity"]["agent_id"], "hermes-lead")
+        self.assertEqual(body["runtime_identity"]["agent_id"], PRIMARY_AGENT_ID)
         self.assertEqual(body["policy"]["runtime_identity"], "verified_service_token")
         self.assertEqual(body["policy"]["agent_runtime_acl"], "enforced")
         spoofed = self.client.get(
-            "/runtime-api/obsidian/workspace?agent_id=agent-engineer",
+            f"/runtime-api/obsidian/workspace?agent_id={SECONDARY_AGENT_ID}",
             headers={"Authorization": f"Bearer {token}"},
         )
         self.assertEqual(spoofed.status_code, 200)
-        self.assertEqual(spoofed.json()["runtime_identity"]["agent_id"], "hermes-lead")
+        self.assertEqual(spoofed.json()["runtime_identity"]["agent_id"], PRIMARY_AGENT_ID)
         self.assertNotIn("r" * 20, good.text)
 
         signature_bytes = self.plugin._b64url_decode(token.split(".")[2])
@@ -213,8 +218,8 @@ class RuntimeAclTests(unittest.TestCase):
         self.assertEqual(after.status_code, 401)
 
     def test_scope_identity_and_path_acl(self):
-        read_a = self._mint("hermes-lead", ["workspace:read"])["token"]
-        read_b = self._mint("agent-engineer", ["workspace:read"])["token"]
+        read_a = self._mint(PRIMARY_AGENT_ID, ["workspace:read"])["token"]
+        read_b = self._mint(SECONDARY_AGENT_ID, ["workspace:read"])["token"]
         own = self.client.get(
             "/runtime-api/obsidian/workspace/notes/private.md",
             headers={"Authorization": f"Bearer {read_a}"},
@@ -222,7 +227,7 @@ class RuntimeAclTests(unittest.TestCase):
         self.assertEqual(own.status_code, 200, own.text)
         self.assertIn("Private A", own.text)
         cross = self.client.get(
-            "/runtime-api/obsidian/workspace/notes/30-Agents/agent-engineer/private.md",
+            f"/runtime-api/obsidian/workspace/notes/30-Agents/{SECONDARY_AGENT_ID}/private.md",
             headers={"Authorization": f"Bearer {read_a}"},
         )
         self.assertEqual(cross.status_code, 400)
@@ -233,12 +238,12 @@ class RuntimeAclTests(unittest.TestCase):
         self.assertEqual(other.status_code, 200, other.text)
         self.assertIn("Private B", other.text)
         traversal = self.client.get(
-            "/runtime-api/obsidian/workspace/notes/../agent-engineer/private.md",
+            f"/runtime-api/obsidian/workspace/notes/../{SECONDARY_AGENT_ID}/private.md",
             headers={"Authorization": f"Bearer {read_a}"},
         )
         self.assertIn(traversal.status_code, (400, 404))
         absolute = self.client.get(
-            "/runtime-api/obsidian/workspace/notes/%2Fopt%2Fdata%2Fobsidian-vault%2F30-Agents%2Fagent-engineer%2Fprivate.md",
+            f"/runtime-api/obsidian/workspace/notes/%2Fopt%2Fdata%2Fobsidian-vault%2F30-Agents%2F{SECONDARY_AGENT_ID}%2Fprivate.md",
             headers={"Authorization": f"Bearer {read_a}"},
         )
         self.assertEqual(absolute.status_code, 400)
@@ -249,18 +254,18 @@ class RuntimeAclTests(unittest.TestCase):
         self.assertEqual(symlink.status_code, 404)
 
     def test_proposal_scope_only_and_no_core_promotion(self):
-        read_only = self._mint("hermes-lead", ["workspace:read"])["token"]
+        read_only = self._mint(PRIMARY_AGENT_ID, ["workspace:read"])["token"]
         denied = self.client.post(
             "/runtime-api/obsidian/workspace/proposals",
             headers={"Authorization": f"Bearer {read_only}"},
             json={"path": "notes/new.md", "content": "pending"},
         )
         self.assertEqual(denied.status_code, 403)
-        writer = self._mint("hermes-lead", ["proposal:create"])["token"]
+        writer = self._mint(PRIMARY_AGENT_ID, ["proposal:create"])["token"]
         mismatch = self.client.post(
             "/runtime-api/obsidian/workspace/proposals",
             headers={"Authorization": f"Bearer {writer}"},
-            json={"agent_id": "agent-engineer", "path": "notes/new.md", "content": "pending"},
+            json={"agent_id": SECONDARY_AGENT_ID, "path": "notes/new.md", "content": "pending"},
         )
         self.assertEqual(mismatch.status_code, 403)
         proposal = self.client.post(
@@ -272,7 +277,7 @@ class RuntimeAclTests(unittest.TestCase):
         body = proposal.json()
         self.assertFalse(body["private_note_written"])
         self.assertTrue(body["approval_required"])
-        self.assertFalse((self.root / "30-Agents/hermes-lead/notes/new.md").exists())
+        self.assertFalse((self.root / "30-Agents" / PRIMARY_AGENT_ID / "notes/new.md").exists())
         self.assertNotIn("/opt/data/", proposal.text)
         core = self.client.post(
             "/runtime-api/obsidian/workspace/proposals",
@@ -283,11 +288,11 @@ class RuntimeAclTests(unittest.TestCase):
 
     def test_owner_routes_remain_session_scoped_and_unknown_agents_rejected(self):
         anonymous = TestClient(self.server.app)
-        denied = anonymous.post("/api/obsidian/runtime-tokens", json={"agent_id": "hermes-lead"})
+        denied = anonymous.post("/api/obsidian/runtime-tokens", json={"agent_id": PRIMARY_AGENT_ID})
         self.assertEqual(denied.status_code, 401)
         anonymous.close()
         self._login()
-        owner = self.client.get("/api/obsidian/agent-workspaces/hermes-lead")
+        owner = self.client.get(f"/api/obsidian/agent-workspaces/{PRIMARY_AGENT_ID}")
         self.assertEqual(owner.status_code, 200, owner.text)
         self.assertEqual(owner.json()["policy"]["scope"], "owner_control_plane")
         unknown = self.client.post(
@@ -304,6 +309,37 @@ class RuntimeAclTests(unittest.TestCase):
         self.assertEqual(unknown2.status_code, 404)
         no_runtime_list = self.client.get("/runtime-api/obsidian/agent-workspaces")
         self.assertEqual(no_runtime_list.status_code, 404)
+
+    def test_namespace_initializer_requires_owner_csrf_and_reads_back_exact_approved_slice(self):
+        anonymous = TestClient(self.server.app)
+        denied = anonymous.post("/api/obsidian/agent-workspaces/initialize", json={})
+        self.assertEqual(denied.status_code, 401)
+        anonymous.close()
+
+        self._login()
+        missing_csrf = self.client.post("/api/obsidian/agent-workspaces/initialize", json={})
+        self.assertEqual(missing_csrf.status_code, 403)
+        initialized = self.client.post(
+            "/api/obsidian/agent-workspaces/initialize",
+            headers=self._owner_headers(),
+            json={},
+        )
+        self.assertEqual(initialized.status_code, 200, initialized.text)
+        body = initialized.json()
+        self.assertEqual(
+            set(body["agent_ids"]),
+            {"hermes-lead", "document-knowledge", "social-research-trends", "content-planner-copywriter"},
+        )
+        self.assertEqual(body["readback"]["count"], 4)
+        self.assertTrue(body["readback"]["verified"])
+        self.assertNotIn("/opt/data/", initialized.text)
+        repeated = self.client.post(
+            "/api/obsidian/agent-workspaces/initialize",
+            headers=self._owner_headers(),
+            json={},
+        )
+        self.assertEqual(repeated.status_code, 200, repeated.text)
+        self.assertEqual(repeated.json()["created_agent_ids"], [])
 
     def test_validly_signed_unknown_and_opencode_tokens_are_forbidden(self):
         for agent_id in ("opencode", "unknown-agent"):

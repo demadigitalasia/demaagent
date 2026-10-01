@@ -244,10 +244,12 @@ class TestDemaDurableIdentityStore(unittest.TestCase):
     def test_existing_roster_phase1_namespace_and_server_wiring_remain_unchanged(self):
         roster_before = ROSTER.read_bytes()
         phase1_before = PHASE1.read_bytes()
-        self.assertEqual(len(json.loads(roster_before)), 11)
         roster = json.loads(roster_before)
-        self.assertFalse(next(row for row in roster if row["id"] == "dema-assistant")["active"])
-        self.assertFalse(next(row for row in roster if row["id"] == "dema-lead")["active"])
+        self.assertEqual(len(roster), len({row["id"] for row in roster}))
+        self.assertNotIn("dema-assistant", {row["id"] for row in roster})
+        self.assertNotIn("dema-lead", {row["id"] for row in roster})
+        for row in roster:
+            self.assertIs(row.get("active"), False, row["id"])
         for entry in json.loads(phase1_before)["candidate_entries"]:
             for flag in ("configured", "tested", "on_demand_ready", "approved_for_users", "active"):
                 self.assertIs(entry["lifecycle"][flag], False)
@@ -265,7 +267,7 @@ class TestDemaDurableIdentityStore(unittest.TestCase):
                 namespace_ids = tuple(ast.literal_eval(node.value))
                 break
         self.assertIsNotNone(namespace_ids)
-        self.assertEqual(len(namespace_ids), 8)
+        self.assertEqual(namespace_ids, ())
         self.assertNotIn("identity_store", SERVER.read_text(encoding="utf-8"))
         self.assertNotIn("identity_store", PLUGIN.read_text(encoding="utf-8"))
 

@@ -14,6 +14,12 @@ BASE = os.environ.get("MC_TEST_BASE", "http://127.0.0.1:9120")
 USER = os.environ.get("HERMES_DASHBOARD_BASIC_AUTH_USERNAME", "")
 PASS = os.environ.get("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "")
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+ROSTER = Path("/opt/data/mission-control/agents.json")
+KNOWLEDGE_AGENT_ID = next(
+    row["id"]
+    for row in json.loads(ROSTER.read_text(encoding="utf-8"))
+    if {"obsidian", "llm-wiki"} <= set(row.get("skills") or [])
+)
 
 
 class Client:
@@ -220,7 +226,7 @@ class TestCsrfProtection(unittest.TestCase):
         status, body = self.client.req(
             "POST",
             "/api/obsidian/runtime-tokens",
-            {"agent_id": "agent-engineer", "ttl_s": 300},
+            {"agent_id": KNOWLEDGE_AGENT_ID, "ttl_s": 300},
             headers={"X-CSRF-Token": self.csrf},
         )
         self.assertEqual(status, 200, body)
@@ -234,7 +240,7 @@ class TestCsrfProtection(unittest.TestCase):
         )
         self.assertEqual(status, 200, workspace)
         self.assertEqual(
-            workspace.get("runtime_identity", {}).get("agent_id"), "agent-engineer"
+            workspace.get("runtime_identity", {}).get("agent_id"), KNOWLEDGE_AGENT_ID
         )
 
     def test_csrf_never_appears_in_json_logs_or_unsafe_source_locations(self):

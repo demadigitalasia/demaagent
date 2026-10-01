@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { apiFetch, apiLogin, apiLogout, AuthError } from "./api.js";
 import {
   LayoutDashboard, ListTodo, CalendarDays, FileText, Building2, Bot, Brain, BookOpen,
@@ -10,18 +11,29 @@ import {
   Monitor, Sofa, Tv, Coffee, Wifi, Radio,
 } from "lucide-react";
 
-// Aplikasi mandiri: wrapper fetch same-origin milik sendiri —
-// 401 -> AuthError -> Root menampilkan halaman login.
+// Aplikasi mandiri: satu jalur fetch untuk semua request terautentikasi.
+// 401 -> satu transisi AuthError -> Root menampilkan halaman login.
+let onUnauthorized = null;
+let unauthorizedNotified = false;
 function safeFetchJSON(url, init) {
-  return apiFetch(url, init);
+  return apiFetch(url, init).catch((err) => {
+    notifyUnauthorized(err);
+    throw err;
+  });
 }
 
-let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
+  if (fn) unauthorizedNotified = false;
+}
+function resetUnauthorizedNotice() {
+  unauthorizedNotified = false;
 }
 function notifyUnauthorized(err) {
-  if (err instanceof AuthError && onUnauthorized) onUnauthorized();
+  if (err instanceof AuthError && onUnauthorized && !unauthorizedNotified) {
+    unauthorizedNotified = true;
+    onUnauthorized();
+  }
 }
 
 const EP = "/api";
@@ -75,6 +87,26 @@ function fmtDateTime(iso) {
     opts.minute = "2-digit";
   }
   return d.toLocaleString("id-ID", opts);
+}
+
+function jsonErrorLocation(text, error) {
+  const raw = String((error && error.message) || error || "JSON tidak valid");
+  const match = raw.match(/position\s+(\d+)/i);
+  if (!match) return raw;
+  const position = Number(match[1]);
+  const before = String(text || "").slice(0, position);
+  const line = before.split("\n").length;
+  const column = position - before.lastIndexOf("\n");
+  return `${raw} (baris ${line}, kolom ${column})`;
+}
+
+function jsonObjectCount(text, fallback = 0) {
+  try {
+    const value = JSON.parse(text || "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value).length : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function modelProviderMap(models) {
@@ -132,18 +164,32 @@ const BAR_CLS = {
   neutral: "bg-[#a1a1aa]",
 };
 
-function Badge({ tone = "neutral", children }) {
-  return <span className={BADGE_CLS[tone] || BADGE_CLS.neutral}>{children}</span>;
+function Badge({ tone = "neutral", className = "", children }) {
+  return <span className={`${BADGE_CLS[tone] || BADGE_CLS.neutral} ${className}`.trim()}>{children}</span>;
 }
 
 function Chip({ children }) {
   return <span className="mc-chip">{children}</span>;
 }
 
-function Loading() {
+function Feedback({ kind = "ok", className = "", id, children }) {
+  const error = kind === "err" || kind === "error" || kind === "bad";
   return (
-    <div className="text-mc-muted text-[13px] py-2.5 flex items-center gap-2">
-      <span className="mc-spinner" /> memuat…
+    <div
+      id={id}
+      className={`${error ? "mc-err" : "mc-ok"} ${className}`.trim()}
+      role={error ? "alert" : "status"}
+      aria-live={error ? "assertive" : "polite"}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Loading({ label = "memuat…" }) {
+  return (
+    <div className="text-mc-muted text-[13px] py-2.5 flex items-center gap-2" role="status" aria-live="polite" aria-busy="true">
+      <span className="mc-spinner" aria-hidden="true" /> {label}
     </div>
   );
 }
@@ -153,12 +199,180 @@ function Empty({ msg }) {
 }
 
 function Unavailable({ msg }) {
-  return <div className="mc-err"><CircleAlert size={13} className="inline mr-1 -mt-0.5" />Tidak tersedia{msg ? `: ${msg}` : ""}</div>;
+  return <div className="mc-err" role="alert" aria-live="assertive"><CircleAlert size={13} className="inline mr-1 -mt-0.5" aria-hidden="true" />Tidak tersedia{msg ? `: ${msg}` : ""}</div>;
 }
 
-function Card({ title, right, children }) {
+const MODAL_FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex=\"-1\"])";
+let modalSequence = 0;
+
+function Modal({ title, subtitle, onClose, children, footer, wide = false, mode = "dialog", initialFocusRef, contentClassName = "", headerContent, busy = false, dialogId }) {
+  const dialogRef = useRef(null);
+  const titleIdRef = useRef(null);
+  const subtitleIdRef = useRef(null);
+  if (!titleIdRef.current) {
+    modalSequence += 1;
+    titleIdRef.current = `mc-modal-title-${modalSequence}`;
+    subtitleIdRef.current = `mc-modal-subtitle-${modalSequence}`;
+  }
+  const titleId = titleIdRef.current;
+  const subtitleId = subtitleIdRef.current;
+
+  useEffect(() => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const shell = document.querySelector("[data-mc-app-shell]");
+    const previousShell = shell ? { inert: shell.hasAttribute("inert"), ariaHidden: shell.getAttribute("aria-hidden") } : null;
+    const previousOverflow = document.body.style.overflow;
+    if (shell) {
+      shell.setAttribute("inert", "");
+      shell.setAttribute("aria-hidden", "true");
+    }
+    document.body.style.overflow = "hidden";
+    const focusFrame = requestAnimationFrame(() => {
+      const target = initialFocusRef && initialFocusRef.current
+        ? initialFocusRef.current
+        : dialogRef.current && dialogRef.current.querySelector(MODAL_FOCUSABLE);
+      (target || dialogRef.current)?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      if (shell && previousShell) {
+        if (previousShell.inert) shell.setAttribute("inert", "");
+        else shell.removeAttribute("inert");
+        if (previousShell.ariaHidden == null) shell.removeAttribute("aria-hidden");
+        else shell.setAttribute("aria-hidden", previousShell.ariaHidden);
+      }
+      document.body.style.overflow = previousOverflow;
+      if (trigger && trigger.isConnected) requestAnimationFrame(() => trigger.focus());
+    };
+  }, [initialFocusRef]);
+
+  function handleKeyDown(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(dialogRef.current.querySelectorAll(MODAL_FOCUSABLE)).filter((el) => el.offsetParent !== null);
+    if (!focusable.length) {
+      e.preventDefault();
+      dialogRef.current.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  if (typeof document === "undefined") return null;
+  const isDrawer = mode === "drawer";
+  const dialogClass = isDrawer
+    ? "relative h-full w-[264px] max-w-[85vw] bg-gradient-to-b from-[#101014] to-mc-sidebar border-r border-mc-border shadow-lift flex flex-col"
+    : `relative w-full ${wide ? "max-w-4xl" : "max-w-2xl"} rounded-2xl bg-mc-card border border-mc-border shadow-lift flex flex-col max-h-[90vh]`;
+  const headerClass = isDrawer
+    ? "flex items-center justify-between gap-3 px-3 pb-3.5 pt-3 border-b border-mc-border"
+    : "flex items-start justify-between gap-3 border-b border-mc-border px-5 py-4";
+  const bodyClass = isDrawer
+    ? "flex flex-col gap-1 p-3 overflow-y-auto overscroll-contain flex-1 min-h-0"
+    : `px-5 py-4 overflow-y-auto overscroll-contain flex-1 min-h-0 ${contentClassName}`;
+
+  return createPortal(
+    <div className={`fixed inset-0 z-[100] flex ${isDrawer ? "justify-start" : "items-center justify-center"} p-0 sm:p-4`}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onMouseDown={onClose} aria-hidden="true" />
+      <div
+        id={dialogId}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        aria-busy={busy || undefined}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        className={dialogClass}
+      >
+        <div className={headerClass}>
+          {headerContent ? (
+            <>
+              <h2 id={titleId} className="sr-only">{title}</h2>
+              <div className="min-w-0 flex-1">{headerContent}</div>
+            </>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <h2 id={titleId} className="m-0 text-[15px] font-semibold text-mc-text">{title}</h2>
+              {subtitle ? <div id={subtitleId} className="text-[11px] text-mc-muted mt-px break-words">{subtitle}</div> : null}
+            </div>
+          )}
+          <button type="button" onClick={onClose} aria-label="Tutup" className="w-8 h-8 rounded-lg flex items-center justify-center text-mc-muted hover:text-mc-text hover:bg-white/5 cursor-pointer shrink-0">
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        {headerContent && subtitle ? <div id={subtitleId} className="sr-only">{subtitle}</div> : null}
+        <div className={bodyClass}>{children}</div>
+        {footer ? <div className="flex justify-end gap-2 border-t border-mc-border px-5 py-3.5">{footer}</div> : null}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function ConfirmModal({
+  title,
+  target,
+  impact,
+  onClose,
+  onConfirm,
+  busy = false,
+  error = null,
+  success = null,
+  confirmLabel = "Hapus",
+  busyLabel = "Menghapus…",
+  confirmIcon: ConfirmIcon = Trash2,
+  busyIcon: BusyIcon = Loader2,
+  confirmClassName = "!text-rose-300 !border-rose-400/40",
+}) {
+  const cancelRef = useRef(null);
+  const completed = Boolean(success);
   return (
-    <div className="mc-card">
+    <Modal
+      title={title}
+      subtitle="Tindakan ini tidak dapat dibatalkan dari dashboard setelah berhasil."
+      onClose={onClose}
+      initialFocusRef={cancelRef}
+      busy={busy}
+      footer={(
+        <>
+          <button type="button" ref={cancelRef} className="mc-btn-ghost" onClick={onClose} disabled={busy}>{completed ? "Tutup" : "Batal"}</button>
+          {!completed ? (
+            <button type="button" className={`mc-btn-ghost ${confirmClassName}`.trim()} onClick={onConfirm} disabled={busy} aria-busy={busy}>
+              {busy ? <><BusyIcon size={13} className="animate-spin" aria-hidden="true" /> {busyLabel}</> : <><ConfirmIcon size={13} aria-hidden="true" /> {confirmLabel}</>}
+            </button>
+          ) : null}
+        </>
+      )}
+    >
+      {completed ? (
+        <Feedback kind="ok" className="rounded-xl border border-green-400/25 bg-green-400/[0.06] p-3.5 mt-0">{success}</Feedback>
+      ) : (
+        <div className="rounded-xl border border-rose-400/25 bg-rose-400/[0.06] p-3.5" role="alert">
+          <div className="text-[13px] font-semibold text-rose-200 break-words">{target}</div>
+          <p className="m-0 mt-1.5 text-[12px] leading-relaxed text-mc-muted">{impact}</p>
+        </div>
+      )}
+      {error ? <Feedback kind="err" className="mt-2">{error}</Feedback> : null}
+    </Modal>
+  );
+}
+
+function Card({ title, right, children, busy = false, className = "" }) {
+  return (
+    <div className={`mc-card ${className}`.trim()} aria-busy={busy || undefined}>
       <div className="mc-card-head">
         <p className="mc-card-title">{title}</p>
         {right}
@@ -374,7 +588,7 @@ function OverviewPanel() {
                   ))}
             </span>
           </div>
-          {gOk ? null : <div className="mc-err">{g.error}</div>}
+          {gOk ? null : <Feedback kind="err">{g.error}</Feedback>}
         </Card>
 
         {/* Kartu 2: aktivitas hari ini */}
@@ -387,7 +601,7 @@ function OverviewPanel() {
           <Row k="Tool calls" v={fmtNum(db.tool_calls_today)} />
           <Row k="Delegasi async" v={fmtNum(db.async_delegations_today)} />
           <Row k="Sesi aktif (all-time)" v={fmtNum(db.active_sessions)} />
-          {dOk ? null : <div className="mc-err">{db.error}</div>}
+          {dOk ? null : <Feedback kind="err">{db.error}</Feedback>}
         </Card>
 
         {/* Kartu 3: total + terakhir */}
@@ -522,9 +736,9 @@ function ActivityPanel() {
           ? Object.entries(sources)
               .filter(([, s]) => !s || s.status !== "ok")
               .map(([name, s]) => (
-                <div key={name} className="mc-err">
+                <Feedback key={name} kind="err">
                   {name}.log: {(s && (s.error || s.file)) || "tidak tersedia"}
-                </div>
+                </Feedback>
               ))
           : null}
       </Card>
@@ -762,7 +976,8 @@ function AgentsPanel() {
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(null); // agent sedang diedit
   const [creating, setCreating] = useState(false);
-  const [del, setDel] = useState(null); // { id, name, confirm }
+  const [del, setDel] = useState(null); // { id, name }
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [menuFor, setMenuFor] = useState(null); // id kartu dengan menu terbuka
   const [msg, setMsg] = useState(null); // { kind, text }
   const [profileFor, setProfileFor] = useState(null); // roster agent yang dibuka di modal detail
@@ -774,7 +989,10 @@ function AgentsPanel() {
         setRoster(d);
         setErr(null);
       })
-      .catch((e) => setErr(e.message || "gagal memuat roster"))
+      .catch((e) => {
+        notifyUnauthorized(e);
+        setErr(e.message || "gagal memuat roster");
+      })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
@@ -803,10 +1021,8 @@ function AgentsPanel() {
   }
 
   async function delAgent(a) {
-    if (!del || !del.confirm) {
-      setDel({ id: a.id, name: a.name, confirm: false });
-      return;
-    }
+    setDeleteBusy(true);
+    setMsg(null);
     try {
       const r = await safeFetchJSON(`${EP}/agents/${a.id}`, { method: "DELETE" });
       if (r && r.status === "ok") {
@@ -817,7 +1033,10 @@ function AgentsPanel() {
         setMsg({ kind: "err", text: (r && r.error) || "gagal menghapus" });
       }
     } catch (e) {
+      notifyUnauthorized(e);
       setMsg({ kind: "err", text: e.message || "gagal menghapus" });
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -841,7 +1060,7 @@ function AgentsPanel() {
         </button>
       </div>
 
-      {msg ? <div className={msg.kind === "ok" ? "mc-ok" : "mc-err"}>{msg.text}</div> : null}
+      {msg ? <Feedback kind={msg.kind}>{msg.text}</Feedback> : null}
 
       {loading && !roster ? (
         <Loading />
@@ -874,9 +1093,9 @@ function AgentsPanel() {
                     </div>
                     <div className="text-[11px] text-mc-muted mt-px">{a.role}</div>
                   </div>
-                  <span className={`mc-chip text-[10.5px] ${tone}`}>
+                  <Badge tone={tone} className="text-[10.5px]">
                     {liveStatus === "running" ? "Running" : liveStatus === "standby" ? "Standby" : liveStatus === "offline" ? "Offline" : "Unknown"}
-                  </span>
+                  </Badge>
                   <div className="relative">
                     <button
                       onClick={() => setMenuFor(menuFor === a.id ? null : a.id)}
@@ -896,17 +1115,13 @@ function AgentsPanel() {
                             <Star size={12} /> Set as active
                           </button>
                           <button
-                            className={`mc-btn-ghost justify-start text-[12px] px-2.5 py-1.5 ${del && del.id === a.id && del.confirm ? "!text-rose-300" : ""}`}
+                            className="mc-btn-ghost justify-start text-[12px] px-2.5 py-1.5 !text-rose-300"
                             onClick={() => {
-                              if (del && del.id === a.id && del.confirm) {
-                                setMenuFor(null);
-                                delAgent(a);
-                              } else {
-                                setDel({ id: a.id, name: a.name, confirm: true });
-                              }
+                              setMenuFor(null);
+                              setDel({ id: a.id, name: a.name });
                             }}
                           >
-                            <Trash2 size={12} /> {del && del.id === a.id && del.confirm ? "Yakin hapus?" : "Delete"}
+                            <Trash2 size={12} /> Delete
                           </button>
                         </div>
                       </>
@@ -963,6 +1178,17 @@ function AgentsPanel() {
       {edit ? (
         <AgentFormModal agent={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); load(); }} />
       ) : null}
+      {del ? (
+        <ConfirmModal
+          title="Hapus agent?"
+          target={del.name}
+          impact="Agent akan dihapus dari roster. Konfigurasi runtime yang sudah ada tidak diaktifkan atau dijalankan oleh tindakan ini. Pastikan target yang dipilih benar sebelum melanjutkan."
+          busy={deleteBusy}
+          error={msg && msg.kind === "err" ? msg.text : null}
+          onClose={() => { if (!deleteBusy) { setDel(null); setMsg(null); } }}
+          onConfirm={() => delAgent(del)}
+        />
+      ) : null}
     </>
   );
 }
@@ -1001,6 +1227,147 @@ function SkillChips({ skills, selected, onToggle }) {
   );
 }
 
+function GovernanceEditor({ profile, onChange }) {
+  const scalarFields = [
+    ["mission", "Mission"],
+    ["authority", "Authority"],
+    ["operating_mode", "Operating mode"],
+    ["language", "Language"],
+    ["verification", "Verification"],
+    ["escalation", "Escalation"],
+  ];
+  const listFields = [
+    ["allowed_actions", "Allowed actions"],
+    ["forbidden_actions", "Forbidden actions"],
+    ["inputs", "Inputs"],
+    ["outputs", "Outputs"],
+  ];
+  const setScalar = (field, value) => onChange({ ...profile, [field]: value });
+  const setListItem = (field, index, value) => {
+    const values = [...profile[field]];
+    values[index] = value;
+    onChange({ ...profile, [field]: values });
+  };
+  const addListItem = (field) => onChange({ ...profile, [field]: [...profile[field], ""] });
+  const removeListItem = (field, index) => {
+    const values = profile[field].filter((_value, itemIndex) => itemIndex !== index);
+    onChange({ ...profile, [field]: values });
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="text-[11px] leading-relaxed text-mc-muted">
+        Governance profile mengatur batas kerja agent. Isi semua field; perubahan ini hanya memperbarui konfigurasi roster dan tidak mengaktifkan runtime otonom.
+      </div>
+      {scalarFields.map(([field, label]) => (
+        <label key={field} className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold text-mc-muted">{label}</span>
+          <textarea
+            className="mc-input w-full resize-y text-[12px] leading-relaxed"
+            rows={3}
+            maxLength={4000}
+            value={profile[field]}
+            onChange={(e) => setScalar(field, e.target.value)}
+            aria-label={`Governance ${label}`}
+          />
+        </label>
+      ))}
+      {listFields.map(([field, label]) => (
+        <div key={field} className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-mc-muted">{label}</span>
+            <button
+              type="button"
+              className="mc-btn-ghost text-[11px] px-2 py-1 inline-flex items-center gap-1"
+              onClick={() => addListItem(field)}
+              disabled={profile[field].length >= 50}
+            >
+              <Plus size={11} /> Tambah
+            </button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {profile[field].map((value, index) => (
+              <div key={`${field}-${index}`} className="flex items-start gap-2">
+                <textarea
+                  className="mc-input w-full resize-y text-[12px] leading-relaxed"
+                  rows={2}
+                  maxLength={2000}
+                  value={value}
+                  onChange={(e) => setListItem(field, index, e.target.value)}
+                  aria-label={`${label} ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  className="mc-btn-ghost text-rose-300 px-2 py-2 shrink-0"
+                  onClick={() => removeListItem(field, index)}
+                  aria-label={`Hapus ${label} ${index + 1}`}
+                  title="Hapus item"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const GOVERNANCE_SCALAR_FIELDS = ["mission", "authority", "operating_mode", "language", "verification", "escalation"];
+const GOVERNANCE_LIST_FIELDS = ["allowed_actions", "forbidden_actions", "inputs", "outputs"];
+const GOVERNANCE_FIELD_ORDER = [
+  "mission", "authority", "operating_mode", "language", "allowed_actions",
+  "forbidden_actions", "inputs", "outputs", "verification", "escalation",
+];
+
+function blankGovernanceProfile() {
+  return {
+    mission: "",
+    authority: "",
+    operating_mode: "",
+    language: "",
+    allowed_actions: [""],
+    forbidden_actions: [""],
+    inputs: [""],
+    outputs: [""],
+    verification: "",
+    escalation: "",
+  };
+}
+
+function normalizeGovernanceProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const next = {};
+  for (const field of GOVERNANCE_SCALAR_FIELDS) next[field] = typeof profile[field] === "string" ? profile[field] : "";
+  for (const field of GOVERNANCE_LIST_FIELDS) next[field] = Array.isArray(profile[field]) ? profile[field].map((item) => typeof item === "string" ? item : "") : [];
+  return next;
+}
+
+function validateGovernanceProfile(profile) {
+  if (!profile) return "";
+  for (const field of GOVERNANCE_SCALAR_FIELDS) {
+    if (!String(profile[field] || "").trim()) return `Governance ${field} wajib diisi.`;
+  }
+  for (const field of GOVERNANCE_LIST_FIELDS) {
+    const values = profile[field];
+    if (!Array.isArray(values) || !values.length || values.some((value) => !String(value || "").trim())) {
+      return `Governance ${field} harus memiliki item yang tidak kosong.`;
+    }
+  }
+  return "";
+}
+
+function cleanGovernanceProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const next = {};
+  for (const field of GOVERNANCE_FIELD_ORDER) {
+    next[field] = GOVERNANCE_SCALAR_FIELDS.includes(field)
+      ? String(profile[field] || "").trim()
+      : profile[field].map((value) => String(value || "").trim());
+  }
+  return next;
+}
+
 function AgentFormModal({ agent, onClose, onSaved }) {
   const isEdit = !!agent;
   const [modelsData, setModelsData] = useState(null);
@@ -1013,6 +1380,8 @@ function AgentFormModal({ agent, onClose, onSaved }) {
   const [skills, setSkills] = useState((agent && agent.skills) || []);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
+  const [governanceProfile, setGovernanceProfile] = useState(null);
+  const [governanceLoading, setGovernanceLoading] = useState(isEdit);
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState(null);
   const personaRef = useRef(null);
@@ -1048,9 +1417,21 @@ function AgentFormModal({ agent, onClose, onSaved }) {
       .then((d) => setSkillList((d.skills && d.skills.skills) || []))
       .catch(() => setSkillList([]));
     if (agent) {
+      setGovernanceLoading(true);
       safeFetchJSON(`${EP}/agent-persona?id=${encodeURIComponent(agent.id)}`)
-        .then((d) => setPersona((d && d.persona) || ""))
-        .catch(() => setPersona(""));
+        .then((d) => {
+          setPersona((d && d.persona) || "");
+          setGovernanceProfile(normalizeGovernanceProfile(d && d.persona_profile));
+        })
+        .catch((e) => {
+          setPersona("");
+          setGovernanceProfile(null);
+          setErr(String((e && e.message) || "Governance profile tidak tersedia."));
+        })
+        .finally(() => setGovernanceLoading(false));
+    } else {
+      setGovernanceLoading(false);
+      setGovernanceProfile(null);
     }
     return () => { cancelled = true; };
   }, [agent]);
@@ -1096,12 +1477,21 @@ function AgentFormModal({ agent, onClose, onSaved }) {
         setSaving(false);
         return;
       }
+      if (isEdit && governanceProfile) {
+        const governanceError = validateGovernanceProfile(governanceProfile);
+        if (governanceError) {
+          setErr(governanceError);
+          setSaving(false);
+          return;
+        }
+      }
       payload = {
         name: name.trim(),
         role: role.trim(),
         persona,
         skills,
       };
+      if (isEdit && governanceProfile) payload.persona_profile = cleanGovernanceProfile(governanceProfile);
       // Do not re-submit an unchanged legacy assignment that is no longer in the
       // live catalog; changing the model still requires exact backend validation.
       if (!isEdit || selectedModel !== initialModel) payload.model = selectedModel;
@@ -1113,7 +1503,14 @@ function AgentFormModal({ agent, onClose, onSaved }) {
         body: JSON.stringify(payload),
       });
       if (r && r.status === "ok") {
-        onSaved();
+        let readback = null;
+        if (isEdit) {
+          readback = await safeFetchJSON(`${EP}/agent-persona?id=${encodeURIComponent(agent.id)}`);
+          if (payload.persona_profile && JSON.stringify(cleanGovernanceProfile(readback.persona_profile)) !== JSON.stringify(cleanGovernanceProfile(payload.persona_profile))) {
+            throw new Error("Readback governance profile tidak sama dengan nilai yang disimpan.");
+          }
+        }
+        onSaved(readback);
       } else {
         setErr((r && r.error) || "gagal menyimpan");
         setSaving(false);
@@ -1129,27 +1526,21 @@ function AgentFormModal({ agent, onClose, onSaved }) {
   }
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label={isEdit ? "Edit agent" : "Buat agent"} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg rounded-2xl bg-mc-card border border-mc-border shadow-lift flex flex-col gap-3 max-h-[90vh]">
-          <div className="flex items-start justify-between gap-3 border-b border-mc-border px-5 py-4">
-            <div className="flex items-center gap-3 min-w-0">
-              {isEdit ? <Avatar name={agent.name} index={0} /> : null}
-              <div>
-                <h3 className="m-0 text-[15px] font-semibold text-mc-text">{isEdit ? "Edit agent" : "Buat agent baru"}</h3>
-                <div className="text-[11px] text-mc-muted mt-px">
-                  {isEdit ? `Agent: ${agent.name}` : "Role, persona, model & tools sendiri"}
-                </div>
-              </div>
-            </div>
-            <button onClick={onClose} aria-label="Tutup" className="w-8 h-8 rounded-lg flex items-center justify-center text-mc-muted hover:text-mc-text hover:bg-white/5 cursor-pointer transition-colors duration-150 shrink-0">
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="px-5 py-5 overflow-y-auto overscroll-contain flex flex-col gap-6 flex-1 min-h-0">
-            {err ? <div className="mc-err">{err}</div> : null}
+    <Modal
+      title={isEdit ? "Edit agent" : "Buat agent baru"}
+      subtitle={isEdit ? `Agent: ${agent.name}` : "Role, persona, model & tools sendiri"}
+      onClose={onClose}
+      contentClassName="py-5 flex flex-col gap-6"
+      footer={(
+        <>
+          <button type="button" className="mc-btn-ghost" onClick={onClose}>Batal</button>
+          <button type="button" className="mc-btn-primary" disabled={saving || !name.trim()} onClick={() => save()} aria-busy={saving}>
+            {saving ? "Menyimpan…" : isEdit ? "Simpan perubahan" : "Buat agent"}
+          </button>
+        </>
+      )}
+    >
+      {err ? <Feedback kind="err">{err}</Feedback> : null}
 
             <div>
               <h4 className="m-0 text-[11px] font-semibold uppercase tracking-wider text-mc-muted mb-2.5">Identitas</h4>
@@ -1173,11 +1564,32 @@ function AgentFormModal({ agent, onClose, onSaved }) {
               </div>
             </div>
 
+            {isEdit ? (
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <h4 className="m-0 text-[11px] font-semibold uppercase tracking-wider text-mc-muted">Governance profile</h4>
+                  {governanceProfile ? <span className="text-[10px] text-mc-muted">10 field terstruktur</span> : null}
+                </div>
+                {governanceLoading ? <Loading /> : governanceProfile ? (
+                  <GovernanceEditor profile={governanceProfile} onChange={setGovernanceProfile} />
+                ) : (
+                  <div className="rounded-xl border border-dashed border-mc-border p-3.5 text-[11.5px] leading-relaxed text-mc-muted">
+                    Agent ini belum memiliki governance profile. Tambahkan profile lengkap bila ingin menyimpan aturan mission, authority, actions, inputs, outputs, verification, dan escalation.
+                    <div className="mt-2.5">
+                      <button type="button" className="mc-btn-ghost text-[11px] px-2.5 py-1.5 inline-flex items-center gap-1.5" onClick={() => setGovernanceProfile(blankGovernanceProfile())}>
+                        <Plus size={12} /> Tambah governance profile
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             <div>
               <h4 className="m-0 text-[11px] font-semibold uppercase tracking-wider text-mc-muted mb-2.5">Model utama</h4>
               <div className="flex flex-col gap-2">
                 {modelsLoading ? <Loading /> : null}
-                {modelsError ? <div className="mc-err">Daftar model tidak tersedia: {modelsError}</div> : null}
+                {modelsError ? <Feedback kind="err">Daftar model tidak tersedia: {modelsError}</Feedback> : null}
                 {!modelsLoading && !modelsError && !providers.length ? <Empty msg="belum ada provider/model yang bisa dipilih" /> : null}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-stretch">
                   <select
@@ -1218,17 +1630,7 @@ function AgentFormModal({ agent, onClose, onSaved }) {
               </h4>
               <SkillChips skills={skillList} selected={skills} onToggle={toggleSkill} />
             </div>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-mc-border px-5 py-3.5">
-            <button className="mc-btn-ghost" onClick={onClose}>Batal</button>
-            <button className="mc-btn-primary" disabled={saving || !name.trim()} onClick={() => save()}>
-              {saving ? "Menyimpan…" : isEdit ? "Simpan perubahan" : "Buat agent"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
+    </Modal>
   );
 }
 
@@ -1236,7 +1638,7 @@ function CoolifyPanel() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [deploying, setDeploying] = useState({ uuid: null, phase: "idle" }); // idle|confirm|busy|done|err
+  const [deploying, setDeploying] = useState({ uuid: null, app: null, phase: "idle" }); // idle|confirm|busy|done|err
   const [msg, setMsg] = useState(null); // { kind, text }
 
   function load() {
@@ -1246,13 +1648,16 @@ function CoolifyPanel() {
         setData(d);
         setErr(null);
       })
-      .catch((e) => setErr(e.message || "gagal memuat status Coolify"))
+      .catch((e) => {
+        notifyUnauthorized(e);
+        setErr(e.message || "gagal memuat status Coolify");
+      })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
 
   async function doDeploy(app) {
-    setDeploying({ uuid: app.uuid, phase: "busy" });
+    setDeploying({ uuid: app.uuid, app, phase: "busy" });
     setMsg(null);
     try {
       const r = await safeFetchJSON(`${EP}/coolify/deploy`, {
@@ -1261,19 +1666,14 @@ function CoolifyPanel() {
         body: JSON.stringify({ uuid: app.uuid }),
       });
       const ok = r && r.status === "queued";
-      setDeploying({ uuid: app.uuid, phase: ok ? "done" : "err" });
-      setMsg(
-        ok
-          ? { kind: "ok", text: `Deploy dikirim: ${app.name} ✓ — refresh untuk status baru` }
-          : { kind: "err", text: (r && r.error) || "deploy ditolak" }
-      );
-      setTimeout(() => {
-        setDeploying({ uuid: null, phase: "idle" });
-        setMsg(null);
-        load();
-      }, 3000);
+      const nextMsg = ok
+        ? { kind: "ok", text: `Deploy dikirim: ${app.name} ✓ — refresh untuk status baru` }
+        : { kind: "err", text: (r && r.error) || "deploy ditolak" };
+      setDeploying({ uuid: app.uuid, app, phase: ok ? "done" : "err" });
+      setMsg(nextMsg);
+      if (ok) setTimeout(load, 3000);
     } catch (e) {
-      setDeploying({ uuid: null, phase: "idle" });
+      setDeploying({ uuid: app.uuid, app, phase: "err" });
       setMsg({ kind: "err", text: e.message || "gagal deploy" });
     }
   }
@@ -1286,7 +1686,7 @@ function CoolifyPanel() {
     s === "running:healthy" ? "ok" : s === "running:unknown" || s === "running" ? "warn" : "bad";
 
   return (
-    <Card title="Coolify — status aplikasi">
+    <Card title="Coolify — status aplikasi" busy={loading || deploying.phase === "busy"}>
       <div className="mc-fresh mb-0.5">
         {err ? (
           `sumber: ${err}`
@@ -1295,14 +1695,12 @@ function CoolifyPanel() {
         ) : (
           `data: ${data.generated_at || ""} · api Coolify v4`
         )}{" "}
-        <button onClick={load} className="ml-1 mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-0.5" aria-label="Muat ulang status">
-          <RefreshCw size={11} className={loading ? "animate-spin" : ""} /> muat ulang
+        <button type="button" onClick={load} className="ml-1 mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-0.5" aria-label="Muat ulang status" aria-busy={loading}>
+          <RefreshCw size={11} className={loading ? "mc-spin" : ""} aria-hidden="true" /> muat ulang
         </button>
       </div>
 
-      {msg ? (
-        <div className={msg.kind === "ok" ? "mc-ok" : "mc-err"}>{msg.text}</div>
-      ) : null}
+      {msg && !deploying.app ? <Feedback kind={msg.kind}>{msg.text}</Feedback> : null}
 
       {st === "ok" ? (
         <>
@@ -1327,7 +1725,7 @@ function CoolifyPanel() {
                     title={a.status}
                   />
                   <span className="text-[13px] font-semibold text-mc-text">{a.name}</span>
-                  <span className={`mc-chip text-[10.5px] ${statusTone(a.status)}`}>{a.status}</span>
+                  <Badge tone={statusTone(a.status)} className="text-[10.5px]">{a.status}</Badge>
                   {a.healthcheck ? (
                     <span className="mc-chip text-[10.5px] inline-flex items-center gap-1">
                       <CheckCircle2 size={10} /> healthcheck
@@ -1352,24 +1750,13 @@ function CoolifyPanel() {
                 <div className="flex items-center justify-between gap-2 flex-wrap text-[10.5px] text-mc-faint font-mono">
                   <span>port: {a.ports || "—"} · update: {a.updated_at || "—"}</span>
                   <button
-                    onClick={() => {
-                      const cur = deploying.uuid === a.uuid ? deploying.phase : "idle";
-                      if (cur === "idle") setDeploying({ uuid: a.uuid, phase: "confirm" });
-                      else if (cur === "confirm") doDeploy(a);
-                      else if (cur === "err") setDeploying({ uuid: null, phase: "idle" });
-                    }}
-                    disabled={deploying.uuid === a.uuid && (deploying.phase === "busy" || deploying.phase === "done")}
-                    className={`mc-btn-ghost inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] ${
-                      deploying.uuid === a.uuid && deploying.phase === "confirm" ? "!text-amber-300 !border-amber-400/40" : ""
-                    }`}
+                    onClick={() => { setMsg(null); setDeploying({ uuid: a.uuid, app: a, phase: "confirm" }); }}
+                    disabled={deploying.phase === "busy" || deploying.phase === "done"}
+                    className="mc-btn-ghost inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px]"
                     aria-label={`Redeploy ${a.name}`}
                   >
-                    {deploying.uuid === a.uuid && deploying.phase === "busy" ? (
-                      <><Loader2 size={11} className="animate-spin" /> mengirim…</>
-                    ) : deploying.uuid === a.uuid && deploying.phase === "done" ? (
+                    {deploying.uuid === a.uuid && deploying.phase === "done" ? (
                       <><Check size={11} /> terkirim</>
-                    ) : deploying.uuid === a.uuid && deploying.phase === "confirm" ? (
-                      <><TriangleAlert size={11} /> yakin redeploy?</>
                     ) : (
                       <><Rocket size={11} /> redeploy</>
                     )}
@@ -1387,6 +1774,22 @@ function CoolifyPanel() {
       ) : (
         <Unavailable msg="belum ada data" />
       )}
+      {deploying.app ? (
+        <ConfirmModal
+          title="Konfirmasi redeploy Coolify"
+          target={deploying.app.name || deploying.app.uuid}
+          impact="Deploy ulang akan mengirim aplikasi ini ke antrean Coolify dan dapat menyebabkan restart singkat. Pastikan target sudah benar sebelum mengonfirmasi."
+          busy={deploying.phase === "busy"}
+          error={deploying.phase === "err" ? (msg && msg.text) : null}
+          success={deploying.phase === "done" ? (msg && msg.text) : null}
+          confirmLabel={deploying.phase === "err" ? "Coba lagi" : "Konfirmasi redeploy"}
+          busyLabel="Mengirim deploy…"
+          confirmIcon={Rocket}
+          confirmClassName="!text-amber-300 !border-amber-400/40"
+          onClose={() => { if (deploying.phase !== "busy") { setDeploying({ uuid: null, app: null, phase: "idle" }); setMsg(null); } }}
+          onConfirm={() => doDeploy(deploying.app)}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -1426,11 +1829,12 @@ function AgentProfileModal({ agent, onClose }) {
         if (alive) setErr(e.message || "gagal memuat persona");
       });
 
+    const runtimeAdapter = agent && agent.routing && agent.routing.runtime_adapter;
     const legacyKey = {
-      "hermes-lead": "lead_agent",
-      "agent-engineer": "agent_engineer",
+      hermes_lead: "lead_agent",
+      agent_engineer: "agent_engineer",
       opencode: "opencode_workers",
-    }[agent.id];
+    }[runtimeAdapter];
     if (legacyKey) {
       safeFetchJSON(`${EP}/agent-profile?agent=${encodeURIComponent(legacyKey)}`)
         .then((d) => {
@@ -1481,25 +1885,21 @@ function AgentProfileModal({ agent, onClose }) {
   );
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label={`Detail persona ${agent.name}`} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl rounded-2xl bg-mc-card border border-mc-border shadow-lift p-5 flex flex-col gap-3 max-h-[88vh]">
-          <div className="flex items-start justify-between gap-3 border-b border-mc-border pb-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="m-0 text-[15px] font-semibold text-mc-text">{agent.name}</h3>
-                <Badge tone={live.status === "online" ? "ok" : live.status === "standby" ? "info" : "neutral"}>{live.status || "unknown"}</Badge>
-                {agent.active ? <span className="mc-chip text-[10.5px]">active</span> : null}
-              </div>
-              <div className="text-[11px] text-mc-muted mt-px">{agent.role || "Role belum tersedia"}</div>
-            </div>
-            <button onClick={onClose} aria-label="Tutup" className="w-8 h-8 rounded-lg flex items-center justify-center text-mc-muted hover:text-mc-text hover:bg-white/5 cursor-pointer transition-colors duration-150 shrink-0">
-              <X size={16} />
-            </button>
-          </div>
-
-          <div className="overflow-y-auto pr-1 flex flex-col gap-4">
+    <Modal
+      title={agent.name}
+      subtitle={agent.role || "Role belum tersedia"}
+      onClose={onClose}
+      wide
+      contentClassName="p-5"
+      headerContent={(
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[15px] font-semibold text-mc-text">{agent.name}</span>
+          <Badge tone={live.status === "online" ? "ok" : live.status === "standby" ? "info" : "neutral"}>{live.status || "unknown"}</Badge>
+          {agent.active ? <span className="mc-chip text-[10.5px]">active</span> : null}
+        </div>
+      )}
+    >
+      <div className="flex flex-col gap-4">
             {err ? <Unavailable msg={err} /> : !personaData ? <Loading /> : null}
 
             <Card title="Governance profile" right={<Badge tone={governance ? "ok" : "neutral"}>{governance ? "tersedia" : "kosong"}</Badge>}>
@@ -1589,14 +1989,8 @@ function AgentProfileModal({ agent, onClose }) {
                 <Row k="Aktif 15 mnt" v={legacy.active_sessions_recent ?? "—"} />
               </Card>
             ) : null}
-          </div>
-
-          <div className="flex justify-end border-t border-mc-border pt-3">
-            <button className="mc-btn-ghost" onClick={onClose}>Tutup</button>
-          </div>
-        </div>
       </div>
-    </>
+    </Modal>
   );
 }
 
@@ -1619,6 +2013,7 @@ function TasksPanel() {
   const [completeTarget, setCompleteTarget] = useState(null); // { id, title } saat modal terbuka
   const [resultText, setResultText] = useState("");
   const [resultErr, setResultErr] = useState(null);
+  const resultRef = useRef(null);
   const [msg, setMsg] = useState(null); // { kind: "ok" | "err", text }
 
   async function handleCreate(e) {
@@ -1729,13 +2124,12 @@ function TasksPanel() {
               type="submit"
               className="mc-btn-primary"
               disabled={submitting}
+              aria-busy={submitting}
             >
               {submitting ? "Membuat…" : "Buat Task"}
             </button>
           </div>
-          {msg ? (
-            <div className={msg.kind === "ok" ? "mc-ok" : "mc-err"}>{msg.text}</div>
-          ) : null}
+          {msg ? <Feedback kind={msg.kind}>{msg.text}</Feedback> : null}
         </form>
       </Card>
 
@@ -1873,60 +2267,34 @@ function TasksPanel() {
       </div>
 
       {completeTarget ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-            onClick={() => {
-              if (!completingId) setCompleteTarget(null);
-            }}
-            aria-hidden
+        <Modal
+          title="Selesaikan task"
+          subtitle={completeTarget.title || completeTarget.id}
+          onClose={() => { if (!completingId) setCompleteTarget(null); }}
+          initialFocusRef={resultRef}
+          busy={!!completingId}
+          footer={(
+            <>
+              <button type="button" className="mc-btn-ghost" disabled={!!completingId} onClick={() => setCompleteTarget(null)}>Batal</button>
+              <button type="button" className="mc-btn-primary" disabled={!!completingId} onClick={() => handleComplete(completeTarget.id)} aria-busy={!!completingId}>
+                {completingId ? <><Loader2 size={13} className="animate-spin" aria-hidden="true" /> Menyimpan…</> : <><Check size={13} aria-hidden="true" /> Selesaikan</>}
+              </button>
+            </>
+          )}
+        >
+          <textarea
+            ref={resultRef}
+            value={resultText}
+            onChange={(e) => setResultText(e.target.value)}
+            rows={3}
+            placeholder="Ringkasan hasil penyelesaian (bukti/summary wajib diisi)…"
+            className="mc-input resize-none w-full"
+            aria-label="Ringkasan hasil"
+            aria-invalid={Boolean(resultErr)}
+            aria-describedby={resultErr ? "task-result-error" : undefined}
           />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Selesaikan task"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <div className="w-full max-w-md rounded-2xl bg-mc-card border border-mc-border shadow-lift p-5 flex flex-col gap-3">
-              <h3 className="m-0 text-[15px] font-semibold text-mc-text">
-                Selesaikan Task
-              </h3>
-              <p className="m-0 text-[13px] text-mc-muted break-words max-h-16 overflow-y-auto">
-                {completeTarget.title || completeTarget.id}
-              </p>
-              <textarea
-                value={resultText}
-                onChange={(e) => setResultText(e.target.value)}
-                rows={3}
-                placeholder="Ringkasan hasil penyelesaian (bukti/summary wajib diisi)…"
-                autoFocus
-                className="mc-input resize-none"
-                aria-label="Ringkasan hasil"
-              />
-              {resultErr ? <div className="mc-err">{resultErr}</div> : null}
-              <div className="flex justify-end gap-2">
-                <button
-                  className="mc-btn-ghost"
-                  disabled={!!completingId}
-                  onClick={() => setCompleteTarget(null)}
-                >
-                  Batal
-                </button>
-                <button
-                  className="mc-btn-primary"
-                  disabled={!!completingId}
-                  onClick={() => handleComplete(completeTarget.id)}
-                >
-                  {completingId ? (
-                    <><Loader2 size={13} className="animate-spin" /> Menyimpan…</>
-                  ) : (
-                    <><Check size={13} /> Selesaikan</>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
+          {resultErr ? <Feedback kind="err" className="mt-2" ><span id="task-result-error">{resultErr}</span></Feedback> : null}
+        </Modal>
       ) : null}
     </>
   );
@@ -1998,32 +2366,8 @@ function CalendarPanel() {
 }
 
 // --- PANEL: Memory & Skill Library ---------------------------------------------
-function ManagedModal({ title, subtitle, onClose, children, footer, wide = false }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className={`w-full ${wide ? "max-w-4xl" : "max-w-2xl"} rounded-2xl bg-mc-card border border-mc-border shadow-lift flex flex-col max-h-[90vh]`}>
-          <div className="flex items-start justify-between gap-3 border-b border-mc-border px-5 py-4">
-            <div className="min-w-0">
-              <h3 className="m-0 text-[15px] font-semibold text-mc-text">{title}</h3>
-              {subtitle ? <div className="text-[11px] text-mc-muted mt-px break-words">{subtitle}</div> : null}
-            </div>
-            <button onClick={onClose} aria-label="Tutup" className="w-8 h-8 rounded-lg flex items-center justify-center text-mc-muted hover:text-mc-text hover:bg-white/5 cursor-pointer shrink-0">
-              <X size={16} />
-            </button>
-          </div>
-          <div className="px-5 py-4 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>
-          {footer ? <div className="flex justify-end gap-2 border-t border-mc-border px-5 py-3.5">{footer}</div> : null}
-        </div>
-      </div>
-    </>
-  );
+function ManagedModal({ title, subtitle, onClose, children, footer, wide = false, contentClassName = "" }) {
+  return <Modal title={title} subtitle={subtitle} onClose={onClose} wide={wide} contentClassName={contentClassName} footer={footer}>{children}</Modal>;
 }
 
 function ManagedTextModal({ file, onClose }) {
@@ -2048,7 +2392,7 @@ function ManagedTextModal({ file, onClose }) {
   return (
     <ManagedModal title={file} subtitle="Isi penuh dari backend; nilai yang tampak seperti credential diredáksi." onClose={onClose} wide
       footer={<><button className="mc-btn-ghost" onClick={copyContent} disabled={!data}>{copied ? "Tersalin ✓" : "Salin isi"}</button><button className="mc-btn-primary" onClick={onClose}>Tutup</button></>}>
-      {err ? <div className="mc-err" role="alert">{err}</div> : null}
+      {err ? <Feedback kind="err">{err}</Feedback> : null}
       {!data && !err ? <Loading /> : data ? <pre className="mc-mem-pre !max-h-none min-h-[220px]">{data.content || "(kosong)"}</pre> : null}
     </ManagedModal>
   );
@@ -2097,7 +2441,7 @@ function MemoryEditModal({ file, mode = "edit", onClose, onSaved }) {
   return (
     <ManagedModal title={mode === "append" ? `Tambah section · ${file}` : `Edit · ${file}`} subtitle="Perubahan ditulis atomik dan backup lama dibuat bila file sudah ada." onClose={onClose} wide
       footer={<><button className="mc-btn-ghost" onClick={onClose}>Batal</button><button className="mc-btn-primary" disabled={saving || loading || (mode === "append" ? !title.trim() || !section.trim() : (redacted && !redactionAcknowledged))} onClick={save}>{saving ? "Menyimpan…" : "Simpan"}</button></>}>
-      {err ? <div className="mc-err" role="alert">{err}</div> : null}
+      {err ? <Feedback kind="err">{err}</Feedback> : null}
       {redacted ? (
         <div className="text-[12px] text-amber-200 bg-amber-400/10 border border-amber-400/30 rounded-lg px-3 py-2.5 mb-3" role="alert">
           <div className="flex items-start gap-2"><TriangleAlert size={14} className="shrink-0 mt-0.5" /><span>Backend menyamarkan nilai sensitif pada isi yang dimuat. Nilai asli tidak dikirim ke browser; menyimpan isi ini dapat menggantinya dengan <code>[redacted]</code>.</span></div>
@@ -2141,23 +2485,36 @@ function SkillLibraryBlock({ blk, legacyBlk, onSelect, onCreate }) {
   const [category, setCategory] = useState("");
   const [assignment, setAssignment] = useState("all");
   const [collapsed, setCollapsed] = useState({});
-  const source = blk && blk.status === "ok" ? blk.skills || [] : (legacyBlk && legacyBlk.status === "ok" ? (legacyBlk.skills || []).map((s) => ({ ...s, assigned_count: null, assigned_agents: [], valid: true })) : []);
+  const rawSource = blk && blk.status === "ok"
+    ? blk.skills || []
+    : (legacyBlk && legacyBlk.status === "ok" ? (legacyBlk.skills || []) : []);
+  const assignmentMetadataAvailable = Boolean(
+    blk && blk.status === "ok" && rawSource.every((s) => Object.prototype.hasOwnProperty.call(s || {}, "assigned_count"))
+  );
+  const source = rawSource.map((s) => ({
+    ...s,
+    assignment_status: assignmentMetadataAvailable
+      ? (Number(s.assigned_count || 0) > 0 ? "assigned" : "available")
+      : "unknown",
+  }));
   const categories = Array.from(new Set(source.map((s) => s.category || "lainnya"))).sort();
   const ql = q.trim().toLowerCase();
   const filtered = source.filter((s) => {
     const text = `${s.name || ""} ${s.category || ""} ${s.description || ""}`.toLowerCase();
-    const assigned = Number(s.assigned_count || 0) > 0;
-    return (!ql || text.includes(ql)) && (!category || s.category === category) && (assignment === "all" || (assignment === "assigned" ? assigned : !assigned));
+    const assigned = s.assignment_status === "assigned";
+    const assignmentMatch = !assignmentMetadataAvailable || assignment === "all"
+      || (assignment === "assigned" ? assigned : s.assignment_status === "available");
+    return (!ql || text.includes(ql)) && (!category || s.category === category) && assignmentMatch;
   });
   const grouped = filtered.reduce((out, s) => { const c = s.category || "lainnya"; (out[c] ||= []).push(s); return out; }, {});
   return (
     <Card title="Library skill" right={<div className="flex items-center gap-2"><Badge tone={blk && blk.status === "ok" ? "ok" : "warn"}>{source.length} skill</Badge><button className="mc-btn-primary !px-2.5 !py-1.5 text-[11px]" onClick={onCreate}><Plus size={12} /> Buat skill</button></div>}>
-      <p className="m-0 text-[12px] text-mc-muted leading-relaxed">Library skill adalah isi <code>SKILL.md</code>. Assignment agent dikelola terpisah di panel Team; label di bawah hanya menunjukkan dampaknya.</p>
+      <p className="m-0 text-[12px] text-mc-muted leading-relaxed">Library skill adalah isi <code>SKILL.md</code>. Assignment agent dikelola terpisah di panel Team; label di bawah hanya menunjukkan dampaknya.{assignmentMetadataAvailable ? "" : " Metadata assignment tidak tersedia, jadi status assignment ditampilkan netral."}</p>
       {blk && blk.status !== "ok" ? <Unavailable msg={blk.error || "skill library tidak tersedia"} /> : null}
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_180px_160px] gap-2 mt-3">
         <input className="mc-input w-full" placeholder="Cari skill, kategori, deskripsi…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari skill library" />
         <select className="mc-select w-full" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter kategori skill"><option value="">Semua kategori</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select>
-        <select className="mc-select w-full" value={assignment} onChange={(e) => setAssignment(e.target.value)} aria-label="Filter assignment"><option value="all">Semua status</option><option value="assigned">Ditugaskan</option><option value="available">Tersedia</option></select>
+        <select className="mc-select w-full" value={assignment} onChange={(e) => setAssignment(e.target.value)} aria-label="Filter assignment" disabled={!assignmentMetadataAvailable}><option value="all">{assignmentMetadataAvailable ? "Semua status" : "Assignment tidak tersedia"}</option><option value="assigned">Ditugaskan</option><option value="available">Tersedia</option></select>
       </div>
       {!filtered.length ? <Empty msg={source.length ? "tidak ada skill yang cocok dengan filter" : "belum ada skill di library"} /> : <div className="flex flex-col gap-2 mt-3">
         {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, rows]) => {
@@ -2167,9 +2524,9 @@ function SkillLibraryBlock({ blk, legacyBlk, onSelect, onCreate }) {
               <span>{isOpen ? "▾" : "▸"} {cat} · {rows.length}</span><span className="text-mc-faint normal-case tracking-normal">kategori</span>
             </button>
             {isOpen ? <div className="p-2 flex flex-col gap-1.5">{rows.map((s) => {
-              const assigned = Number(s.assigned_count || 0) > 0;
+              const assigned = s.assignment_status === "assigned";
               return <button key={`${s.category}/${s.name}`} className="mc-feed-item text-left hover:border-sky-400/40" onClick={() => onSelect(s)} aria-label={`Detail skill ${s.name}`}>
-                <div className="min-w-0 flex-1"><div className="flex items-center gap-2 flex-wrap"><span className="text-[12px] font-semibold text-mc-text break-all">{s.name}</span><Badge tone={assigned ? "info" : "neutral"}>{assigned ? `ditugaskan · ${s.assigned_count}` : "tersedia"}</Badge>{s.valid === false ? <Badge tone="warn">frontmatter perlu diperiksa</Badge> : null}</div><div className="text-[11px] text-mc-muted mt-0.5 break-words">{s.description || "Deskripsi belum tersedia"}</div>{assigned ? <div className="text-[10.5px] text-sky-300/80 mt-1">Agent: {(s.assigned_agents || []).map((a) => a.name).join(", ") || "metadata assignment tidak tersedia"}</div> : null}</div><Eye size={14} className="text-mc-muted shrink-0" />
+                <div className="min-w-0 flex-1"><div className="flex items-center gap-2 flex-wrap"><span className="text-[12px] font-semibold text-mc-text break-all">{s.name}</span><Badge tone={assigned ? "info" : "neutral"}>{assigned ? `ditugaskan · ${s.assigned_count}` : s.assignment_status === "unknown" ? "assignment tidak tersedia" : "tersedia"}</Badge>{s.valid === false ? <Badge tone="warn">frontmatter perlu diperiksa</Badge> : null}</div><div className="text-[11px] text-mc-muted mt-0.5 break-words">{s.description || "Deskripsi belum tersedia"}</div>{assigned ? <div className="text-[10.5px] text-sky-300/80 mt-1">Agent: {(s.assigned_agents || []).map((a) => a.name).join(", ") || "metadata assignment tidak tersedia"}</div> : null}</div><Eye size={14} className="text-mc-muted shrink-0" />
               </button>;
             })}</div> : null}
           </div>;
@@ -2216,7 +2573,7 @@ function SkillEditorModal({ skill, onClose, onSaved }) {
   }
   return <ManagedModal title={editing ? `Edit skill · ${skill.name}` : "Buat skill library"} subtitle="Nama/category aman dan frontmatter name + description wajib ada." onClose={onClose} wide
     footer={<><button className="mc-btn-ghost" onClick={onClose}>Batal</button><button className="mc-btn-primary" disabled={saving || loading || !category.trim() || !name.trim() || !content.trim() || (redacted && !redactionAcknowledged)} onClick={save}>{saving ? "Menyimpan…" : "Simpan"}</button></>}>
-    {err ? <div className="mc-err" role="alert">{err}</div> : null}
+    {err ? <Feedback kind="err">{err}</Feedback> : null}
     {redacted ? <div className="text-[12px] text-amber-200 bg-amber-400/10 border border-amber-400/30 rounded-lg px-3 py-2.5 mb-3" role="alert"><div className="flex items-start gap-2"><TriangleAlert size={14} className="shrink-0 mt-0.5" /><span>Backend menyamarkan nilai sensitif pada isi skill yang dimuat. Nilai asli tidak dikirim ke browser; menyimpan isi ini dapat menggantinya dengan <code>[redacted]</code>.</span></div><label className="mt-2 flex items-start gap-2 text-[11.5px] text-amber-100 cursor-pointer"><input type="checkbox" className="mt-0.5" checked={redactionAcknowledged} onChange={(e) => setRedactionAcknowledged(e.target.checked)} />Saya mengerti dan ingin menyimpan perubahan ini secara eksplisit.</label></div> : null}
     {loading ? <Loading /> : <div className="flex flex-col gap-3"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2"><label className="text-[12px] text-mc-muted">Category<input className="mc-input w-full mt-1" value={category} disabled={editing} onChange={(e) => setCategory(e.target.value)} aria-label="Category skill" /></label><label className="text-[12px] text-mc-muted">Name<input className="mc-input w-full mt-1" value={name} disabled={editing} onChange={(e) => setName(e.target.value)} aria-label="Nama skill" /></label></div><label className="text-[12px] text-mc-muted">Isi SKILL.md<textarea className="mc-input w-full mt-1 min-h-[460px] font-mono text-[12px] leading-relaxed" value={content} onChange={(e) => setContent(e.target.value)} aria-label="Isi SKILL.md" /></label></div>}
   </ManagedModal>;
@@ -2225,23 +2582,30 @@ function SkillEditorModal({ skill, onClose, onSaved }) {
 function SkillDetailModal({ skill, onClose, onEdit, onDeleted }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     safeFetchJSON(`${EP}/skill-library/${encodeURIComponent(skill.category)}/${encodeURIComponent(skill.name)}`)
       .then(setData)
       .catch((e) => { notifyUnauthorized(e); setErr(e.message || "gagal memuat skill"); });
   }, [skill]);
   async function remove() {
-    const agents = (data && data.assigned_agents) || skill.assigned_agents || [];
-    const impact = agents.length ? `\n\nSkill masih ditugaskan ke: ${agents.map((a) => a.name).join(", ")}. Assignment TIDAK akan dihapus otomatis.` : "";
-    if (!window.confirm(`Hapus skill ${skill.name}?${impact}\n\nTindakan ini membuat SKILL.md tidak tersedia lagi. Lanjutkan hanya jika yakin.`)) return;
+    setDeleting(true);
+    setErr(null);
     try {
       const r = await safeFetchJSON(`${EP}/skill-library/${encodeURIComponent(skill.category)}/${encodeURIComponent(skill.name)}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
       if (r && r.status === "ok") onDeleted(); else setErr((r && r.error) || "skill tidak dihapus");
     } catch (e) { notifyUnauthorized(e); setErr(e.message || "skill tidak dihapus"); }
+    finally { setDeleting(false); }
   }
+  const assignedAgents = (data && data.assigned_agents) || skill.assigned_agents || [];
+  const impact = assignedAgents.length
+    ? `Skill masih ditugaskan ke: ${assignedAgents.map((a) => a.name).join(", ")}. Assignment tidak akan dihapus otomatis.`
+    : "SKILL.md akan tidak tersedia lagi dari library.";
   return <ManagedModal title={`${skill.category}/${skill.name}`} subtitle="Skill library terpisah dari assignment agent." onClose={onClose} wide
-    footer={<><button className="mc-btn-ghost" onClick={() => onEdit(data || skill)}><Pencil size={12} /> Edit</button><button className="mc-btn-ghost !text-rose-300" onClick={remove}><Trash2 size={12} /> Hapus</button><button className="mc-btn-primary" onClick={onClose}>Tutup</button></>}>
-    {err ? <div className="mc-err" role="alert">{err}</div> : null}
+    footer={confirmingDelete ? <><button className="mc-btn-ghost" onClick={() => { if (!deleting) { setConfirmingDelete(false); setErr(null); } }} disabled={deleting}>Batal</button><button className="mc-btn-ghost !text-rose-300 !border-rose-400/40" onClick={remove} disabled={deleting} aria-busy={deleting}>{deleting ? <><Loader2 size={12} className="animate-spin" /> Menghapus…</> : <><Trash2 size={12} /> Hapus permanen</>}</button></> : <><button className="mc-btn-ghost" onClick={() => onEdit(data || skill)}><Pencil size={12} /> Edit</button><button className="mc-btn-ghost !text-rose-300" onClick={() => { setErr(null); setConfirmingDelete(true); }}><Trash2 size={12} /> Hapus</button><button className="mc-btn-primary" onClick={onClose}>Tutup</button></>}>
+    {confirmingDelete ? <div className="rounded-xl border border-rose-400/25 bg-rose-400/[0.06] p-3.5" role="alert"><div className="text-[13px] font-semibold text-rose-200">Hapus {skill.name}?</div><p className="m-0 mt-1.5 text-[12px] leading-relaxed text-mc-muted">{impact}</p></div> : null}
+    {err ? <Feedback kind="err">{err}</Feedback> : null}
     {!data && !err ? <Loading /> : data ? <div className="flex flex-col gap-3"><div className="grid grid-cols-2 sm:grid-cols-4 gap-2"><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-sky-300">{data.chars || 0}</div><div className="text-[10px] text-mc-muted">karakter</div></div><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-violet-300">{data.assigned_count || 0}</div><div className="text-[10px] text-mc-muted">agent ditugaskan</div></div><div className="mc-agent-card !p-2.5 col-span-2"><div className="text-[11px] font-semibold text-mc-text break-words">{data.description || "Deskripsi belum tersedia"}</div><div className="text-[10px] text-mc-muted">metadata frontmatter</div></div></div><div><SectionLabel>Agent terdampak</SectionLabel>{data.assigned_agents && data.assigned_agents.length ? <div className="flex flex-wrap gap-1.5">{data.assigned_agents.map((a) => <span key={a.id} className="mc-chip text-sky-300">{a.name}</span>)}</div> : <Empty msg="skill belum ditugaskan ke agent" />}</div><div><SectionLabel>Preview SKILL.md</SectionLabel><pre className="mc-mem-pre !max-h-[420px]">{data.content || "(kosong)"}</pre></div></div> : null}
   </ManagedModal>;
 }
@@ -2254,29 +2618,55 @@ function MemoryPanel() {
   const [memoryEditor, setMemoryEditor] = useState(null);
   const [skillEditor, setSkillEditor] = useState(null);
   const [skillDetail, setSkillDetail] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // memory file awaiting confirmation
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   const [msg, setMsg] = useState(null);
   const mem = (data && data.memory) || {};
   const memOk = mem.status === "ok";
   const limit = mem.limit_chars || 2000;
   const refresh = () => { setMsg({ kind: "ok", text: "Perubahan tersimpan ✓" }); setTick((n) => n + 1); };
-  async function deleteMemory(file) {
-    if (!window.confirm(`Hapus ${file}? File akan di-backup dan UI akan menampilkan status tidak tersedia.`)) return;
+  async function deleteMemory() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
     try {
-      const r = await safeFetchJSON(`${EP}/memory/files/${encodeURIComponent(file)}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
-      if (r && r.status === "ok") refresh(); else setMsg({ kind: "err", text: (r && r.error) || "file tidak dihapus" });
-    } catch (e) { notifyUnauthorized(e); setMsg({ kind: "err", text: e.message || "file tidak dihapus" }); }
+      const r = await safeFetchJSON(`${EP}/memory/files/${encodeURIComponent(deleteTarget)}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
+      if (r && r.status === "ok") {
+        setDeleteTarget(null);
+        refresh();
+      } else {
+        setDeleteError((r && r.error) || "file tidak dihapus");
+      }
+    } catch (e) {
+      notifyUnauthorized(e);
+      setDeleteError(e.message || "file tidak dihapus");
+    } finally {
+      setDeleteBusy(false);
+    }
   }
   if (!data && !error) return <Loading />;
   if (error) return <Card title="Skills & Memory"><Unavailable msg={error} /></Card>;
   return <>
     <header className="mc-card !p-5"><div className="flex items-start justify-between gap-3 flex-wrap"><div><h2 className="m-0 text-xl font-semibold text-mc-text">Skills & Memory</h2><p className="m-0 mt-1.5 text-[13px] leading-relaxed text-mc-muted max-w-3xl">Kelola memori global dan library <code>SKILL.md</code> dengan aman. Isi memory bisa diedit di sini; assignment skill per agent tetap berada di panel Team.</p></div><Badge tone="info">manager terautentikasi</Badge></div><div className="mc-fresh mt-3">{refreshing ? "memuat…" : "auto-refresh 30 dtk"} · data: {data.generated_at || ""}</div></header>
-    {msg ? <div className={msg.kind === "ok" ? "mc-ok" : "mc-err"} role="status">{msg.text}</div> : null}
-    <section aria-labelledby="memory-heading"><div className="flex items-center justify-between gap-2 flex-wrap mb-2"><div><h3 id="memory-heading" className="m-0 text-[14px] font-semibold text-mc-text">Memory global</h3><p className="m-0 mt-0.5 text-[11px] text-mc-muted">MEMORY.md dan USER.md · preview jujur bila terpotong</p></div><Badge tone={memOk ? "ok" : "bad"}>{memOk ? "tersedia" : "unavailable"}</Badge></div><div className="mc-panel-grid"><MemoryFileCard name="MEMORY.md" blk={memOk ? mem["MEMORY.md"] : null} limit={limit} onView={() => setViewer("MEMORY.md")} onEdit={() => setMemoryEditor({ file: "MEMORY.md", mode: "edit" })} onAppend={() => setMemoryEditor({ file: "MEMORY.md", mode: "append" })} onDelete={() => deleteMemory("MEMORY.md")} /><MemoryFileCard name="USER.md" blk={memOk ? mem["USER.md"] : null} limit={limit} onView={() => setViewer("USER.md")} onEdit={() => setMemoryEditor({ file: "USER.md", mode: "edit" })} onAppend={() => setMemoryEditor({ file: "USER.md", mode: "append" })} onDelete={() => deleteMemory("USER.md")} /></div></section>
+    {msg ? <Feedback kind={msg.kind}>{msg.text}</Feedback> : null}
+    <section aria-labelledby="memory-heading"><div className="flex items-center justify-between gap-2 flex-wrap mb-2"><div><h3 id="memory-heading" className="m-0 text-[14px] font-semibold text-mc-text">Memory global</h3><p className="m-0 mt-0.5 text-[11px] text-mc-muted">MEMORY.md dan USER.md · preview jujur bila terpotong</p></div><Badge tone={memOk ? "ok" : "bad"}>{memOk ? "tersedia" : "unavailable"}</Badge></div><div className="mc-panel-grid"><MemoryFileCard name="MEMORY.md" blk={memOk ? mem["MEMORY.md"] : null} limit={limit} onView={() => setViewer("MEMORY.md")} onEdit={() => setMemoryEditor({ file: "MEMORY.md", mode: "edit" })} onAppend={() => setMemoryEditor({ file: "MEMORY.md", mode: "append" })} onDelete={() => { setDeleteError(null); setDeleteTarget("MEMORY.md"); }} /><MemoryFileCard name="USER.md" blk={memOk ? mem["USER.md"] : null} limit={limit} onView={() => setViewer("USER.md")} onEdit={() => setMemoryEditor({ file: "USER.md", mode: "edit" })} onAppend={() => setMemoryEditor({ file: "USER.md", mode: "append" })} onDelete={() => { setDeleteError(null); setDeleteTarget("USER.md"); }} /></div></section>
     <section aria-labelledby="library-heading"><div className="flex items-center justify-between gap-2 flex-wrap mb-2"><div><h3 id="library-heading" className="m-0 text-[14px] font-semibold text-mc-text">Library skill</h3><p className="m-0 mt-0.5 text-[11px] text-mc-muted">CRUD isi skill terpisah dari assignment pada agent.</p></div><span className="text-[11px] text-mc-faint">{libraryError ? "Library tidak tersedia" : "Filter tidak mereset saat auto-refresh"}</span></div><SkillLibraryBlock blk={library} legacyBlk={data.skills} onSelect={setSkillDetail} onCreate={() => setSkillEditor({})} /></section>
     {viewer ? <ManagedTextModal file={viewer} onClose={() => setViewer(null)} /> : null}
     {memoryEditor ? <MemoryEditModal file={memoryEditor.file} mode={memoryEditor.mode} onClose={() => setMemoryEditor(null)} onSaved={() => { setMemoryEditor(null); refresh(); }} /> : null}
     {skillEditor ? <SkillEditorModal skill={skillEditor.name ? skillEditor : null} onClose={() => setSkillEditor(null)} onSaved={() => { setSkillEditor(null); refresh(); }} /> : null}
     {skillDetail ? <SkillDetailModal skill={skillDetail} onClose={() => setSkillDetail(null)} onEdit={(s) => { setSkillDetail(null); setSkillEditor(s); }} onDeleted={() => { setSkillDetail(null); refresh(); }} /> : null}
+    {deleteTarget ? (
+      <ConfirmModal
+        title="Hapus file memory?"
+        target={deleteTarget}
+        impact="File akan dihapus setelah backup dibuat oleh backend, lalu dashboard akan menampilkan status tidak tersedia. Tidak ada agent runtime yang akan dijalankan oleh tindakan ini."
+        busy={deleteBusy}
+        error={deleteError}
+        onClose={() => { if (!deleteBusy) { setDeleteTarget(null); setDeleteError(null); } }}
+        onConfirm={deleteMemory}
+      />
+    ) : null}
   </>;
 }
 
@@ -2376,9 +2766,24 @@ function PixelSprite({ x, y, cell = 6, colors, sit = false, sel = false, onClick
   const w = rows[0].length * cell;
   const h = rows.length * cell;
   return (
-    <g style={{ cursor: onClick ? "pointer" : "default" }} onClick={onClick} role={onClick ? "button" : undefined} aria-label={title}>
+    <g
+      className={onClick ? "mc-pixel-sprite" : undefined}
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={title}
+      aria-pressed={onClick ? sel : undefined}
+    >
       {title ? <title>{title}</title> : null}
       {sel ? <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="3 3" /> : null}
+      {onClick ? <rect className="mc-sprite-focus-ring" x={x - 5} y={y - 5} width={w + 10} height={h + 10} fill="none" stroke="#7dd3fc" strokeWidth="2" rx="2" pointerEvents="none" /> : null}
       {rects}
     </g>
   );
@@ -2432,51 +2837,55 @@ function deriveOfficeData(office, roster, ag) {
 
   const stateOf = (a) => {
     const live = a.live || {};
-    const base = live.status || "";
+    const base = a.live_status || (live.status === "online" ? "running" : live.status || "unknown");
+    const sourceStatus = a.live_source_status || live.source_status || "unknown";
+    const runtimeAdapter = (a.routing && a.routing.runtime_adapter) || live.runtime_adapter || "";
     const reasons = [];
     const need = (name, src) => {
       if (!src || src.status !== "ok") { reasons.push(`sumber ${name} tidak tersedia`); return false; }
       return true;
     };
-    if (base === "online") {
-      if (a.id === "hermes-lead") {
+    if (base === "running" || base === "online") {
+      if (runtimeAdapter === "hermes_lead") {
         const wOk = need("gateway_active_agents", wrs);
         const sOk = need("active_sessions", o.active_sessions);
         if (sOk && sessArr.some((s) => s.source === "subagent" && s.active)) {
           return { st: "working", reasons: reasons.concat(["active_sessions: ada sesi sub-agent aktif (Hermes mengawasi)"]) };
         }
         if (wOk && wrs.active_work) return { st: "working", reasons: reasons.concat(["gateway_active_agents.active_work terisi"]) };
-        if (wOk || sOk) return { st: "idle", reasons: reasons.concat(["roster online — tanpa kerja berjalan di /office"]) };
+        if (wOk || sOk) return { st: "idle", reasons: reasons.concat(["runtime adapter aktif — tanpa kerja berjalan di /office"]) };
         return { st: "unknown", reasons };
       }
-      if (a.id === "agent-engineer") {
+      if (runtimeAdapter === "agent_engineer") {
         const eOk = need("running_delegations", engs);
         if (!eOk) return { st: "unknown", reasons };
         if (engs.count > 0) return { st: "working", reasons: reasons.concat(["running_delegations.count>0 → delegasi coding berjalan"]) };
-        return { st: "idle", reasons: reasons.concat(["roster online — running_delegations=0"]) };
+        return { st: "idle", reasons: reasons.concat(["runtime adapter aktif — running_delegations=0"]) };
       }
-      if (a.id === "opencode") {
+      if (runtimeAdapter === "opencode") {
         const cOk = need("opencode_workers", ocs);
         if (!cOk) return { st: "unknown", reasons };
         if (ocs.active) return { st: "working", reasons: reasons.concat(["opencode_workers.active (sesi ≤15 mnt di opencode.db)"]) };
-        return { st: "idle", reasons: reasons.concat(["roster online — probe 15 mnt = 0"]) };
+        return { st: "idle", reasons: reasons.concat(["runtime adapter aktif — probe 15 mnt = 0"]) };
       }
-      return { st: "idle", reasons: reasons.concat(["roster online — tanpa sinyal kerja spesifik"]) };
+      return { st: "working", reasons: ["backend live_status=running"] };
     }
-    if (base === "standby") return { st: "unknown", reasons: ["roster live.status=standby (dibuat — belum ada data runtime)"] };
-    if (base === "offline") return { st: "offline", reasons: ["roster live.status=offline"] };
-    return { st: "unknown", reasons: ["roster tanpa status live"] };
+    if (base === "standby") return { st: "unknown", reasons: [sourceStatus === "not_configured" ? "runtime belum dikonfigurasi" : "backend live_status=standby"] };
+    if (base === "offline") return { st: "offline", reasons: ["backend live_status=offline"] };
+    if (base === "blocked") return { st: "unknown", reasons: ["backend live_status=blocked"] };
+    return { st: "unknown", reasons: ["backend live_status=unknown atau sumber tidak tersedia"] };
   };
 
   const agents = list.map((a, ridx) => {
     const { st, reasons } = stateOf(a);
+    const runtimeAdapter = (a.routing && a.routing.runtime_adapter) || (a.live && a.live.runtime_adapter) || "";
     let taskNow = null, lastAct = null;
-    if (a.id === "hermes-lead") {
+    if (runtimeAdapter === "hermes_lead") {
       const sub = sessArr.filter((s) => s.source === "subagent" && s.active);
       if (sub.length) taskNow = `Mengawasi sub-agent · ${shortId(sub[0].id)} (mulai ${fmtTime(sub[0].started_at_iso)})`;
       const r0 = sortedBy(leadRows, "started_at_iso")[0];
       if (r0) lastAct = r0.active ? `Sesi ${r0.source} aktif sejak ${fmtTime(r0.started_at_iso)}` : `Sesi ${r0.source} selesai ${fmtTime(r0.ended_at_iso)}`;
-    } else if (a.id === "agent-engineer") {
+    } else if (runtimeAdapter === "agent_engineer") {
       const run = engs.status === "ok" ? engs.running_ids || [] : [];
       if (run.length) {
         const d0 = delegRecent.find((dd) => dd.delegation_id === run[0]);
@@ -2484,7 +2893,7 @@ function deriveOfficeData(office, roster, ag) {
       }
       const r0 = sortedBy(engRows, "started_at_iso")[0];
       if (r0) lastAct = r0.active ? `Sesi sub-agent aktif sejak ${fmtTime(r0.started_at_iso)}` : `Sub-agent selesai ${fmtTime(r0.ended_at_iso)} (${r0.end_reason || "?"})`;
-    } else if (a.id === "opencode") {
+    } else if (runtimeAdapter === "opencode") {
       if (ocs.status === "ok" && ocs.active) taskNow = `Sesi opencode dalam ${Math.round((ocs.recent_window_s || 900) / 60)} mnt terakhir`;
       const r0 = sortedBy(ocSess, "time_updated_iso")[0];
       if (r0) lastAct = `Sesi terakhir ${fmtAgo(new Date(r0.time_updated_iso).getTime() / 1000)} · ${shortId(r0.id)}`;
@@ -2871,12 +3280,12 @@ function OfficePanel() {
         title="Visual Office"
         right={<Badge tone="info">read-only</Badge>}
       >
-        <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-2.5 flex-wrap" role="group" aria-label="Pilih ruangan Visual Office">
           {ROOM_DEFS.map((r) => (
             <button
               key={r.key}
-              role="tab"
-              aria-selected={room === r.key}
+              type="button"
+              aria-pressed={room === r.key}
               onClick={() => setRoom(r.key)}
               className={`mc-btn-ghost inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 ${room === r.key ? "!text-sky-300 !border-sky-400/50 !bg-sky-400/10" : ""}`}
             >
@@ -2890,8 +3299,17 @@ function OfficePanel() {
             <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: STATE_META.unknown.color }} /> unknown</span>
           </span>
         </div>
+        <p className="sm:hidden m-0 mb-2 text-[11px] text-sky-300/90">↔ Geser horizontal untuk melihat seluruh ruangan.</p>
         <div style={{ overflowX: "auto", maxWidth: "100%" }}>
           <VisualOfficeSVG room={room} d={d} selId={selId} onSelect={setSelId} gwLine={gwLine} tvLines={tvLines} />
+        </div>
+        <div className="sm:hidden mt-3" aria-label="Daftar agent Visual Office">
+          <div className="mc-section-label !p-0 mb-1.5">Daftar agent (alternatif akses)</div>
+          {d.agents.length ? <div className="flex flex-col gap-1.5">{d.agents.map((x) => (
+            <button type="button" key={x.a.id} onClick={() => setSelId(x.a.id)} aria-pressed={selId === x.a.id} className={`mc-feed-item text-left ${selId === x.a.id ? "border-sky-400/60 bg-sky-400/10" : ""}`}>
+              <div className="min-w-0 flex-1"><div className="text-[12px] font-semibold text-mc-text break-words">{x.a.name}</div><div className="text-[10.5px] text-mc-muted mt-0.5">{x.a.role || "—"}</div></div><Badge tone={x.st === "working" ? "ok" : x.st === "unknown" ? "warn" : "neutral"}>{STATE_META[x.st]?.label || x.st}</Badge>
+            </button>
+          ))}</div> : <Empty msg="agent belum tersedia" />}
         </div>
         <div className="mc-footnote">
           Klik karakter agent untuk detail. Bekerja → Workspace (dekat workstation sendiri); Idle/Offline → Lounge; tak dapat ditentukan → Zona Unknown (berlabel).
@@ -2979,9 +3397,9 @@ function OfficePanel() {
         {[[ "gateway_active_agents", st8.leadSrc ], [ "active_sessions", st8.wrSrc ], [ "running_delegations", st8.engSrc ], [ "opencode_workers", st8.ocSrc ]]
           .filter(([, s]) => !s || s.status !== "ok")
           .map(([name, s]) => (
-            <div key={name} className="mc-err">
+            <Feedback key={name} kind="err">
               {name}: {(s && (s.error || "tidak tersedia")) || "tidak tersedia"}
-            </div>
+            </Feedback>
           ))}
         <div className="mc-section-label mt-2">Channel (dari /api/overview → gateway.platforms)</div>
         {platforms ? (
@@ -3001,7 +3419,7 @@ function OfficePanel() {
           <Unavailable msg="gateway/platforms tidak tersedia" />
         )}
         {ov && ov.gateway && ov.gateway.status !== "ok" ? (
-          <div className="mc-err">gateway: {(ov.gateway.error) || "tidak tersedia"}</div>
+          <Feedback kind="err">gateway: {(ov.gateway.error) || "tidak tersedia"}</Feedback>
         ) : null}
       </Card>
 
@@ -3128,8 +3546,8 @@ function AgentWorkspacePanel() {
       }
     >
       {data && data.status !== "ok" ? <Unavailable msg={data.error || "workspace tidak tersedia"} /> : null}
-      {detailError ? <div className="mc-err mb-2">Workspace gagal dimuat: {detailError}</div> : null}
-      {proposalMessage ? <div className={proposalMessage.kind === "ok" ? "mc-ok mb-2" : "mc-err mb-2"} role="status">{proposalMessage.text}</div> : null}
+      {detailError ? <Feedback kind="err" className="mb-2">Workspace gagal dimuat: {detailError}</Feedback> : null}
+      {proposalMessage ? <Feedback kind={proposalMessage.kind} className="mb-2">{proposalMessage.text}</Feedback> : null}
       <div className="text-[10.5px] text-mc-faint mb-3">
         Scope private: <code>30-Agents/{selectedAgentId || "<agent-id>"}</code> · shared read: <code>10-Wiki</code> · owner session: {policy.scope || "owner_control_plane"} · runtime API: <code>verified_service_token / enforced</code>
       </div>
@@ -3453,7 +3871,7 @@ function ObsidianPanel() {
           <Plus size={13} /> {composerOpen ? "Tutup form" : "Buat catatan"}
         </button>
       </div>
-      {writeMessage ? <div className={writeMessage.kind === "ok" ? "mc-ok mb-2" : "mc-err mb-2"} role="status">{writeMessage.text}</div> : null}
+      {writeMessage ? <Feedback kind={writeMessage.kind} className="mb-2">{writeMessage.text}</Feedback> : null}
       <Card
         title="Knowledge Base — Obsidian"
         right={<div className="flex items-center gap-2 flex-wrap justify-end"><Badge tone={statusTone}>{statusOk ? "tersedia" : (vault.status || "unavailable")}</Badge><Badge tone="info">VPS-only · auth write</Badge></div>}
@@ -3464,7 +3882,7 @@ function ObsidianPanel() {
           <div className="mc-agent-card !p-2.5 col-span-2 sm:col-span-2"><div className="text-[12px] font-mono text-mc-text break-words">{vault.vault_path || "—"}</div><div className="text-[10px] text-mc-muted">lokasi tampilan aman · tanpa GUI / sync</div></div>
         </div>
         {!statusOk ? <Unavailable msg={vault.error || error || "vault tidak tersedia"} /> : null}
-        {error && statusOk ? <div className="mc-err mb-2">Refresh status gagal: {error}</div> : null}
+        {error && statusOk ? <Feedback kind="err" className="mb-2">Refresh status gagal: {error}</Feedback> : null}
         {composerOpen ? (
           <form onSubmit={createNote} className="border border-sky-400/20 bg-sky-400/[0.04] rounded-xl p-3 mb-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2"><div className="mc-section-label !p-0">Catatan durable baru</div><Badge tone="warn">core MEMORY.md/USER.md tidak disentuh</Badge></div>
@@ -3484,7 +3902,7 @@ function ObsidianPanel() {
           <input className="mc-input !min-w-0 w-full sm:flex-1" value={query} maxLength={120} onChange={(e) => setQuery(e.target.value)} placeholder="Cari nama file atau isi catatan…" aria-label="Cari catatan Obsidian" />
           <select className="mc-select w-full sm:w-auto sm:min-w-[170px]" value={folder} onChange={(e) => setFolder(e.target.value)} aria-label="Filter folder Obsidian"><option value="">Semua folder</option>{folders.map((name) => <option key={name} value={name}>{name}</option>)}</select>
         </div>
-        {searchError ? <div className="mc-err mb-2">Pencarian gagal: {searchError}</div> : null}
+        {searchError ? <Feedback kind="err" className="mb-2">Pencarian gagal: {searchError}</Feedback> : null}
         {searching && !searchData ? <Loading /> : searchData && searchData.status !== "ok" ? <Unavailable msg={searchData.error || "vault tidak tersedia"} /> : null}
         {searchData && searchData.status === "ok" ? (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] gap-3 min-w-0">
@@ -3526,7 +3944,7 @@ function ObsidianPanel() {
       </Card>
       <div className="mc-footnote">Knowledge Base membaca Markdown langsung dari vault VPS. Pembuatan note memakai sesi dashboard, atomic write, validasi path, redaksi secret, dan tidak pernah menulis MEMORY.md/USER.md.</div>
 
-      {ingestMessage ? <div className={ingestMessage.kind === "ok" ? "mc-ok" : "mc-err"} role="status">{ingestMessage.text}</div> : null}
+      {ingestMessage ? <Feedback kind={ingestMessage.kind}>{ingestMessage.text}</Feedback> : null}
       <Card
         title="Reviewed ingestion"
         right={<div className="flex items-center gap-2"><Badge tone="info">raw immutable</Badge><button type="button" className="mc-btn-ghost inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1" onClick={() => { setIngestOpen((v) => !v); setIngestMessage(null); }}><Plus size={13} /> {ingestOpen ? "Tutup" : "Ajukan sumber"}</button></div>}
@@ -3551,7 +3969,7 @@ function ObsidianPanel() {
 
       <Card
         title="Inbox proposals"
-        right={<div className="flex items-center gap-2"><Badge tone={proposalsData && proposalsData.count ? "warn" : "neutral"}>{proposalsData ? `${proposalsData.count || 0} proposal` : "—"}</Badge><button type="button" className="mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-1" onClick={loadProposals} disabled={proposalsLoading}><RefreshCw size={12} className={proposalsLoading ? "mc-spin" : ""} /> Refresh</button></div>}
+        right={<div className="flex items-center gap-2"><Badge tone={proposalsData && proposalsData.count ? "warn" : "neutral"}>{proposalsData ? `${proposalsData.count || 0} proposal` : "—"}</Badge><button type="button" className="mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-1" onClick={loadProposals} disabled={proposalsLoading} aria-busy={proposalsLoading}><RefreshCw size={12} className={proposalsLoading ? "mc-spin" : ""} aria-hidden="true" /> Refresh</button></div>}
       >
         {proposalsError ? <Unavailable msg={proposalsError} /> : proposalsLoading && !proposalsData ? <Loading /> : !proposalsData || !Array.isArray(proposalsData.proposals) || proposalsData.proposals.length === 0 ? <Empty msg="belum ada proposal reviewed" /> : (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)] gap-3 min-w-0">
@@ -3578,8 +3996,8 @@ function ObsidianPanel() {
                       <label className="flex items-start gap-2 text-[11px] text-amber-100 cursor-pointer"><input type="checkbox" className="mt-0.5" checked={approvalConfirm} onChange={(e) => setApprovalConfirm(e.target.checked)} />Saya sudah meninjau proposal dan menyetujui penulisan ke <code className="break-all">{approvalTarget || "target path"}</code>.</label>
                       <button type="submit" className="mc-btn-primary inline-flex items-center gap-1.5 self-start" disabled={approvalBusy || !approvalTarget.trim() || !approvalConfirm}><CheckCircle2 size={13} /> {approvalBusy ? "Approving…" : "Approve proposal"}</button>
                     </form>
-                  ) : <div className="mc-ok mt-3">Proposal sudah diproses; approval tidak diulang.</div>}
-                  {approvalMessage ? <div className={approvalMessage.kind === "ok" ? "mc-ok mt-2" : "mc-err mt-2"} role="status">{approvalMessage.text}</div> : null}
+                  ) : <Feedback kind="ok" className="mt-3">Proposal sudah diproses; approval tidak diulang.</Feedback>}
+                  {approvalMessage ? <Feedback kind={approvalMessage.kind} className="mt-2">{approvalMessage.text}</Feedback> : null}
                 </div>
               )}
             </div>
@@ -3589,12 +4007,12 @@ function ObsidianPanel() {
 
       <Card
         title="Wiki lint"
-        right={<div className="flex items-center gap-2"><Badge tone={lintData && lintData.counts && lintData.counts.total ? "warn" : "ok"}>{lintData && lintData.counts ? `${lintData.counts.total} issue` : "—"}</Badge><button type="button" className="mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-1" onClick={loadLint} disabled={lintLoading}><RefreshCw size={12} className={lintLoading ? "mc-spin" : ""} /> Lint ulang</button></div>}
+        right={<div className="flex items-center gap-2"><Badge tone={lintData && lintData.counts && lintData.counts.total ? "warn" : "ok"}>{lintData && lintData.counts ? `${lintData.counts.total} issue` : "—"}</Badge><button type="button" className="mc-btn-ghost inline-flex items-center gap-1 text-[11px] px-2 py-1" onClick={loadLint} disabled={lintLoading} aria-busy={lintLoading}><RefreshCw size={12} className={lintLoading ? "mc-spin" : ""} aria-hidden="true" /> Lint ulang</button></div>}
       >
         {lintError ? <Unavailable msg={lintError} /> : lintLoading && !lintData ? <Loading /> : !lintData ? <Empty msg="lint belum dijalankan" /> : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3"><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-red-300">{lintData.counts && lintData.counts.error || 0}</div><div className="text-[10px] text-mc-muted">error</div></div><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-amber-300">{lintData.counts && lintData.counts.warning || 0}</div><div className="text-[10px] text-mc-muted">warning</div></div><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-sky-300">{lintData.counts && lintData.counts.info || 0}</div><div className="text-[10px] text-mc-muted">info</div></div><div className="mc-agent-card !p-2.5"><div className="text-[18px] font-bold text-violet-300">{lintData.counts && lintData.counts.total || 0}</div><div className="text-[10px] text-mc-muted">total</div></div></div>
-            {!lintData.issues || lintData.issues.length === 0 ? <div className="mc-ok">Wiki lint bersih untuk scope accepted pages.</div> : <div className="flex flex-col gap-1.5 max-h-[430px] overflow-y-auto pr-0.5">{lintData.issues.map((issue, i) => <div key={`${issue.path}-${issue.rule}-${i}`} className="border border-mc-border rounded-lg p-2"><div className="flex items-start gap-2 flex-wrap"><Badge tone={issue.severity === "error" ? "bad" : issue.severity === "warning" ? "warn" : "info"}>{issue.severity}</Badge><span className="text-[11px] font-mono text-mc-text break-all">{issue.path}</span><span className="text-[10.5px] text-mc-muted font-mono">{issue.rule}</span></div><div className="text-[11px] text-mc-faint mt-1">{issue.message}</div></div>)}</div>}
+            {!lintData.issues || lintData.issues.length === 0 ? <Feedback kind="ok">Wiki lint bersih untuk scope accepted pages.</Feedback> : <div className="flex flex-col gap-1.5 max-h-[430px] overflow-y-auto pr-0.5">{lintData.issues.map((issue, i) => <div key={`${issue.path}-${issue.rule}-${i}`} className="border border-mc-border rounded-lg p-2"><div className="flex items-start gap-2 flex-wrap"><Badge tone={issue.severity === "error" ? "bad" : issue.severity === "warning" ? "warn" : "info"}>{issue.severity}</Badge><span className="text-[11px] font-mono text-mc-text break-all">{issue.path}</span><span className="text-[10.5px] text-mc-muted font-mono">{issue.rule}</span></div><div className="text-[11px] text-mc-faint mt-1">{issue.message}</div></div>)}</div>}
           </>
         )}
       </Card>
@@ -3790,7 +4208,7 @@ class ErrorBoundary extends React.Component {
       const msg = String((this.state.err && this.state.err.message) || this.state.err).slice(0, 220);
       return (
         <Card title="Panel gagal dimuat">
-          <div className="mc-err">{msg || "error tak diketahui"}</div>
+          <Feedback kind="err">{msg || "error tak diketahui"}</Feedback>
           <button
             className="mc-btn-ghost mt-2"
             onClick={() => this.setState({ err: null })}
@@ -3872,6 +4290,7 @@ function ModelsPanel() {
               className="mc-btn-ghost"
               onClick={() => load(true)}
               disabled={busy}
+              aria-busy={busy}
               aria-label="Muat ulang daftar model dari Hermes"
               title="Refresh katalog Hermes + OpenCode"
             >
@@ -3884,7 +4303,7 @@ function ModelsPanel() {
           <Unavailable msg={error} />
         ) : (
           <>
-            {error ? <div className="mc-err mb-2">Refresh gagal: {error}</div> : null}
+            {error ? <Feedback kind="err" className="mb-2">Refresh gagal: {error}</Feedback> : null}
             <div className="mc-row items-center">
               <span className="mc-row-key">Default (Hermes)</span>
               <Chip>{modelCatalogDefault(m) || "—"}</Chip>
@@ -3990,6 +4409,225 @@ function SessionChip() {
   );
 }
 
+// --- Routing & workflow control plane -----------------------------------------
+function RoutingPanel({ onDirtyChange }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [configText, setConfigText] = useState("");
+  const [metadataText, setMetadataText] = useState("");
+  const [savedConfigText, setSavedConfigText] = useState("");
+  const [savedMetadataText, setSavedMetadataText] = useState("");
+  const [parseErrors, setParseErrors] = useState({});
+  const [taskText, setTaskText] = useState("");
+  const [hintsText, setHintsText] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+  const dirty = Boolean(data) && (configText !== savedConfigText || metadataText !== savedMetadataText);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  function metadataFromResponse(json) {
+    return (json.agents || []).reduce((out, agent) => {
+      if (agent && agent.id) out[agent.id] = agent.routing || {};
+      return out;
+    }, {});
+  }
+
+  async function load(force = false) {
+    if (!force && dirty) {
+      setMessage({ kind: "err", text: "Perubahan Routing belum disimpan. Simpan atau batalkan sebelum memuat ulang." });
+      return;
+    }
+    try {
+      const json = await safeFetchJSON(`${EP}/routing`);
+      const nextConfig = JSON.stringify(json.config || {}, null, 2);
+      const nextMetadata = JSON.stringify(metadataFromResponse(json), null, 2);
+      setData(json);
+      setConfigText(nextConfig);
+      setMetadataText(nextMetadata);
+      setSavedConfigText(nextConfig);
+      setSavedMetadataText(nextMetadata);
+      setParseErrors({});
+      setError(null);
+      setMessage(null);
+    } catch (e) {
+      notifyUnauthorized(e);
+      setError(String((e && e.message) || e));
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const beforeUnload = (event) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty]);
+
+  function formatJson(field) {
+    const text = field === "config" ? configText : metadataText;
+    try {
+      const formatted = JSON.stringify(JSON.parse(text || (field === "config" ? "{}" : "{}")), null, 2);
+      if (field === "config") setConfigText(formatted);
+      else setMetadataText(formatted);
+      setParseErrors((old) => ({ ...old, [field]: null }));
+      setMessage({ kind: "ok", text: `${field === "config" ? "Workflow" : "Metadata agent"} JSON diformat.` });
+    } catch (e) {
+      const detail = e instanceof SyntaxError ? jsonErrorLocation(text, e).replace(/^JSON\.parse: /, "") : "JSON tidak valid";
+      setParseErrors((old) => ({ ...old, [field]: detail }));
+      setMessage({ kind: "err", text: `${field === "config" ? "Workflow" : "Metadata agent"}: JSON tidak valid.` });
+    }
+  }
+
+  function discardChanges() {
+    setConfigText(savedConfigText);
+    setMetadataText(savedMetadataText);
+    setParseErrors({});
+    setMessage({ kind: "ok", text: "Draft Routing dikembalikan ke readback tersimpan." });
+    setPreview(null);
+  }
+
+  async function save() {
+    let config;
+    let agent_metadata;
+    setParseErrors({});
+    try {
+      config = JSON.parse(configText);
+    } catch (e) {
+      const detail = e instanceof SyntaxError ? jsonErrorLocation(configText, e) : "JSON tidak valid";
+      setParseErrors({ config: detail });
+      setMessage({ kind: "err", text: "Workflow JSON tidak valid; perbaiki error pada field tersebut sebelum menyimpan." });
+      return;
+    }
+    try {
+      agent_metadata = JSON.parse(metadataText || "{}");
+    } catch (e) {
+      const detail = e instanceof SyntaxError ? jsonErrorLocation(metadataText, e) : "JSON tidak valid";
+      setParseErrors({ metadata: detail });
+      setMessage({ kind: "err", text: "Agent routing metadata JSON tidak valid; perbaiki error pada field tersebut sebelum menyimpan." });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const json = await safeFetchJSON(`${EP}/routing`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config, agent_metadata }),
+      });
+      setData(json);
+      const nextConfig = JSON.stringify(json.config || {}, null, 2);
+      const nextMetadata = JSON.stringify(metadataFromResponse(json), null, 2);
+      setConfigText(nextConfig);
+      setMetadataText(nextMetadata);
+      setSavedConfigText(nextConfig);
+      setSavedMetadataText(nextMetadata);
+      setParseErrors({});
+      setMessage({ kind: "ok", text: "Routing config dan metadata tersimpan atomik." });
+    } catch (e) {
+      notifyUnauthorized(e);
+      setMessage({ kind: "err", text: String((e && e.message) || e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runPreview(e) {
+    e.preventDefault();
+    if (dirty) {
+      setMessage({ kind: "err", text: "Preview memakai konfigurasi tersimpan terakhir. Simpan atau kembalikan draft sebelum preview." });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const json = await safeFetchJSON(`${EP}/routing/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_text: taskText,
+          capability_hints: hintsText.split(",").map((item) => item.trim()).filter(Boolean),
+        }),
+      });
+      setPreview(json);
+    } catch (e2) {
+      notifyUnauthorized(e2);
+      setMessage({ kind: "err", text: String((e2 && e2.message) || e2) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error && !data) return <Unavailable msg={error} />;
+  if (!data) return <Loading />;
+  const config = data.config || {};
+  const persistedRevision = data.revision || data.updated_at || data.generated_at || "backend tidak mengekspos revisi";
+  return (
+    <>
+      <header className="mc-card !p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="m-0 text-xl font-semibold text-mc-text">Routing & Workflows</h2>
+            <p className="m-0 mt-1.5 text-[13px] leading-relaxed text-mc-muted max-w-3xl">Konfigurasi owner untuk routing berbasis capability. Preview deterministik; tidak meluncurkan agent dan tidak menulis ke layanan eksternal.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {dirty ? <Badge tone="warn">unsaved changes</Badge> : <Badge tone="ok">readback tersimpan</Badge>}
+            {dirty ? <button type="button" className="mc-btn-ghost inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5" onClick={discardChanges} disabled={busy}><X size={12} aria-hidden="true" /> Kembalikan draft</button> : null}
+            <button type="button" className="mc-btn-ghost inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5" onClick={() => load()} disabled={busy} aria-busy={busy}>
+              <RefreshCw size={12} className={busy ? "mc-spin" : ""} aria-hidden="true" /> Muat ulang
+            </button>
+            <Badge tone="info">{data.runtime && data.runtime.configured ? "configured" : "unavailable"}</Badge>
+          </div>
+        </div>
+        {message ? <Feedback kind={message.kind} className="mt-3">{message.text}</Feedback> : null}
+      </header>
+      <div className="mc-panel-grid">
+        <Card title="Workflow definitions & capability rules" busy={busy} right={<div className="flex items-center gap-1.5"><button type="button" className="mc-btn-ghost !px-2 !py-1 text-[11px]" onClick={() => formatJson("config")} disabled={busy}>Format</button><button type="button" className="mc-btn-primary !px-2.5 !py-1.5 text-[11px]" onClick={save} disabled={busy} aria-busy={busy}><Save size={12} /> Simpan</button></div>}>
+          <p className="m-0 text-[11px] text-mc-muted">File durable: <code>workflows.json</code> · backup rollback: <code>workflows.json.bak</code> · validasi schema tetap dilakukan backend.</p>
+          <details className="mt-2 text-[11px] text-mc-muted"><summary className="cursor-pointer text-sky-300">Petunjuk schema</summary><div className="mt-1.5 leading-relaxed">Object utama memuat <code>version</code>, <code>default_workflow</code>, <code>workflows[]</code>, dan <code>routing_rules[]</code>. ID/capability, stage, approval gate, dan keyword tetap divalidasi backend.</div></details>
+          <textarea className={`mc-input w-full min-h-[360px] mt-3 font-mono text-[11px] leading-relaxed ${parseErrors.config ? "!border-rose-400/70" : ""}`} value={configText} onChange={(e) => { setConfigText(e.target.value); setParseErrors((old) => ({ ...old, config: null })); }} aria-label="Workflow configuration JSON" aria-invalid={Boolean(parseErrors.config)} aria-describedby={parseErrors.config ? "routing-config-error" : undefined} />
+          {parseErrors.config ? <Feedback id="routing-config-error" kind="err">Workflow JSON parse error: {parseErrors.config}</Feedback> : null}
+        </Card>
+        <Card busy={busy} title="Agent routing metadata" right={<div className="flex items-center gap-1.5"><button type="button" className="mc-btn-ghost !px-2 !py-1 text-[11px]" onClick={() => formatJson("metadata")} disabled={busy}>Format</button><Badge tone="neutral">{jsonObjectCount(savedMetadataText, 11)} roster records</Badge></div>}>
+          <p className="m-0 text-[11px] text-mc-muted">Capabilities, tags, accepts/outputs, parent, runtime owner/mode, approval, priority, availability. Status live tidak disimpulkan dari konfigurasi.</p>
+          <details className="mt-2 text-[11px] text-mc-muted"><summary className="cursor-pointer text-sky-300">Petunjuk field agent</summary><div className="mt-1.5 leading-relaxed">Setiap key agent dapat memuat <code>capabilities</code>, <code>tags</code>, <code>accepts</code>, <code>outputs</code>, <code>parent_id</code>, <code>runtime_owner</code>, <code>runtime_mode</code>, <code>approval_policy</code>, <code>priority</code>, dan <code>availability</code>.</div></details>
+          <textarea className={`mc-input w-full min-h-[360px] mt-3 font-mono text-[11px] leading-relaxed ${parseErrors.metadata ? "!border-rose-400/70" : ""}`} value={metadataText} onChange={(e) => { setMetadataText(e.target.value); setParseErrors((old) => ({ ...old, metadata: null })); }} aria-label="Agent routing metadata JSON" aria-invalid={Boolean(parseErrors.metadata)} aria-describedby={parseErrors.metadata ? "routing-metadata-error" : undefined} />
+          {parseErrors.metadata ? <Feedback id="routing-metadata-error" kind="err">Agent metadata JSON parse error: {parseErrors.metadata}</Feedback> : null}
+        </Card>
+      </div>
+      <Card title="Route preview / simulation" busy={busy} right={<div className="flex items-center gap-1.5"><Badge tone="neutral">no launch</Badge><Badge tone={dirty ? "warn" : "info"}>{dirty ? "simpan/kembalikan dulu" : "preview config tersimpan"}</Badge></div>}>
+        <p className="m-0 mb-2 text-[11px] leading-relaxed text-mc-muted">Preview ini memakai konfigurasi persisted terakhir dari backend, bukan draft textarea. Revision/readback: <code>{persistedRevision}</code>. Saat ada perubahan lokal, simpan atau kembalikan draft sebelum menjalankan preview.</p>
+        <form onSubmit={runPreview} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px_auto] gap-2 items-end">
+          <label className="text-[11px] text-mc-muted">Task text<input className="mc-input w-full mt-1" value={taskText} onChange={(e) => setTaskText(e.target.value)} placeholder="Contoh: perbaiki backend API dan tambahkan test" aria-label="Task text" /></label>
+          <label className="text-[11px] text-mc-muted">Capability hints<input className="mc-input w-full mt-1" value={hintsText} onChange={(e) => setHintsText(e.target.value)} placeholder="backend, testing" aria-label="Capability hints" /></label>
+          <button className="mc-btn-primary" type="submit" disabled={busy || dirty || !taskText.trim()} aria-busy={busy}><Eye size={13} /> {busy ? "Memproses…" : "Preview"}</button>
+        </form>
+        {preview ? <pre className="mt-3 p-3 rounded-xl bg-black/20 border border-mc-border overflow-x-auto text-[11px] leading-relaxed text-mc-muted">{JSON.stringify(preview, null, 2)}</pre> : <Empty msg="masukkan task untuk melihat workflow, kandidat, alasan, dan approval gates" />}
+      </Card>
+      <Card title="Configured workflows" right={<Badge tone="neutral">{(config.workflows || []).length}</Badge>}>
+        <div className="flex flex-col gap-2">
+          {(config.workflows || []).map((workflow) => (
+            <div key={workflow.id} className="rounded-xl border border-mc-border bg-black/10 p-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap"><strong className="text-[13px] text-mc-text">{workflow.name || workflow.id}</strong><span className="mc-chip font-mono text-[10px]">{workflow.id}</span></div>
+              <div className="mt-1 text-[11px] text-mc-muted">{(workflow.stages || []).length} stages · capabilities: {(workflow.capabilities || []).join(", ") || "—"} · gates: {(workflow.approval_gates || []).join(", ") || "none"}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 // --- ROOT ------------------------------------------------------------------------
 const TAB_GROUPS = [
   {
@@ -4007,6 +4645,7 @@ const TAB_GROUPS = [
     section: "Agents",
     items: [
       { key: "agents", label: "Team", icon: Bot },
+      { key: "routing", label: "Routing", icon: Repeat },
       { key: "models", label: "Models", icon: Cpu },
       { key: "memory", label: "Skills & Memory", icon: Brain },
       { key: "activity", label: "Chat Logs", icon: MessageSquare },
@@ -4020,7 +4659,19 @@ const TAB_GROUPS = [
   },
 ];
 const TABS = TAB_GROUPS.flatMap((g) => g.items);
+const TAB_KEYS = new Set(TABS.map((tab) => tab.key));
 const tabLabel = (key) => (TABS.find((t) => t.key === key) || {}).label || key;
+function tabFromLocation() {
+  if (typeof window === "undefined") return "overview";
+  const candidate = new URLSearchParams(window.location.search).get("panel");
+  return TAB_KEYS.has(candidate) ? candidate : "overview";
+}
+function writeTabLocation(tab, replace = false) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("panel", TAB_KEYS.has(tab) ? tab : "overview");
+  window.history[replace ? "replaceState" : "pushState"]({ panel: tab }, "", `${url.pathname}${url.search}${url.hash}`);
+}
 
 function BrandLogo({ size = "sm" }) {
   // logo box gradien sky→violet, dipakai sidebar & header mobile
@@ -4035,9 +4686,13 @@ function BrandLogo({ size = "sm" }) {
 }
 
 export function MissionControlApp({ onLogout }) {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(tabFromLocation);
   const [drawer, setDrawer] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
   const [wide, setWide] = useState(typeof window !== "undefined" && window.innerWidth >= 820);
+  const routingDirtyRef = useRef(false);
+  const currentTabRef = useRef(tab);
+  currentTabRef.current = tab;
 
   useEffect(() => {
     const h = () => setWide(window.innerWidth >= 820);
@@ -4045,30 +4700,45 @@ export function MissionControlApp({ onLogout }) {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  // kunci scroll body saat drawer mobile terbuka + a11y (Escape menutup, fokus masuk)
   useEffect(() => {
-    if (!drawer) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => {
-      if (e.key === "Escape") setDrawer(false);
+    const initial = tabFromLocation();
+    if (initial !== tab) setTab(initial);
+    const current = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("panel") : null;
+    if (current !== initial) writeTabLocation(initial, true);
+    const onPopState = () => {
+      const next = tabFromLocation();
+      if (currentTabRef.current === "routing" && next !== "routing" && routingDirtyRef.current) {
+        writeTabLocation("routing", true);
+        setPendingTab(next);
+        return;
+      }
+      setPendingTab(null);
+      setTab(next);
     };
-    document.addEventListener("keydown", onKey);
-    const t = setTimeout(() => {
-      const first = document.querySelector("#mc-drawer button");
-      if (first) first.focus();
-    }, 60);
-    return () => {
-      document.body.style.overflow = prev;
-      document.removeEventListener("keydown", onKey);
-      clearTimeout(t);
-    };
-  }, [drawer]);
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // URL is the source of truth only for initial load and browser history events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function selectTab(next, { force = false } = {}) {
+    const safeTab = TAB_KEYS.has(next) ? next : "overview";
+    if (!force && tab === "routing" && safeTab !== "routing" && routingDirtyRef.current) {
+      setPendingTab(safeTab);
+      return;
+    }
+    if (tab === "routing" && safeTab !== "routing") routingDirtyRef.current = false;
+    setPendingTab(null);
+    setTab(safeTab);
+    writeTabLocation(safeTab);
+    setDrawer(false);
+  }
 
   let body;
   if (tab === "overview") body = <OverviewPanel />;
   else if (tab === "activity") body = <ActivityPanel />;
   else if (tab === "agents") body = <AgentsPanel />;
+  else if (tab === "routing") body = <RoutingPanel onDirtyChange={(dirty) => { routingDirtyRef.current = dirty; }} />;
   else if (tab === "tasks") body = <TasksPanel />;
   else if (tab === "calendar") body = <CalendarPanel />;
   else if (tab === "memory") body = <MemoryPanel />;
@@ -4081,6 +4751,10 @@ export function MissionControlApp({ onLogout }) {
 
   const activeLabel = tabLabel(tab);
 
+  useEffect(() => {
+    document.title = `${activeLabel} · Mission Control`;
+  }, [activeLabel]);
+
   const navSection = (g) => (
     <div key={g.section}>
       <div className="mc-section-label">
@@ -4089,12 +4763,9 @@ export function MissionControlApp({ onLogout }) {
       {g.items.map((t) => (
         <button
           key={t.key}
-          role="tab"
-          aria-selected={tab === t.key}
-          onClick={() => {
-            setTab(t.key);
-            setDrawer(false);
-          }}
+          type="button"
+          aria-current={tab === t.key ? "page" : undefined}
+          onClick={() => selectTab(t.key)}
           className={`mc-nav-btn ${tab === t.key ? "mc-nav-btn-active" : ""}`}
         >
           <span className="shrink-0" aria-hidden>{t.icon ? <t.icon size={15} /> : null}</span>
@@ -4105,7 +4776,7 @@ export function MissionControlApp({ onLogout }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-mc-bg text-mc-text">
+    <div data-mc-app-shell className="flex min-h-screen bg-mc-bg text-mc-text">
       {wide ? (
         <aside className="w-[216px] shrink-0 bg-gradient-to-b from-[#101014] to-mc-sidebar border-r border-mc-border flex flex-col gap-1 p-3 sticky top-0 h-screen">
           <div className="flex items-center gap-2.5 px-2 pb-3.5 mb-2.5 border-b border-mc-border">
@@ -4114,7 +4785,7 @@ export function MissionControlApp({ onLogout }) {
               Mission Control
             </span>
           </div>
-          <nav className="flex flex-col gap-0.5 flex-1" role="tablist" aria-label="Panel">
+          <nav className="flex flex-col gap-0.5 flex-1" aria-label="Panel">
             {TAB_GROUPS.map(navSection)}
           </nav>
           <div className="flex flex-col gap-2.5 border-t border-mc-border pt-3">
@@ -4128,52 +4799,31 @@ export function MissionControlApp({ onLogout }) {
         </aside>
       ) : null}
       {!wide && drawer ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-            onClick={() => setDrawer(false)}
-            aria-hidden
-          />
-          <aside
-            id="mc-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu navigasi"
-            className="fixed inset-y-0 left-0 z-50 w-[264px] max-w-[85vw] bg-gradient-to-b from-[#101014] to-mc-sidebar border-r border-mc-border flex flex-col gap-1 p-3 shadow-lift animate-[mc-drawer_.2s_ease-out]"
-          >
-            <div className="flex items-center justify-between px-2 pb-3.5 mb-2.5 border-b border-mc-border">
-              <div className="flex items-center gap-2.5">
-                <BrandLogo />
-                <span className="text-[15px] font-bold tracking-tight bg-gradient-to-r from-sky-300 to-violet-300 bg-clip-text text-transparent">
-                  Mission Control
-                </span>
-              </div>
-              <button
-                onClick={() => setDrawer(false)}
-                aria-label="Tutup menu"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-mc-muted hover:text-mc-text hover:bg-white/5 cursor-pointer transition-colors duration-150"
-              >
-                <X size={16} />
+        <Modal
+          title="Menu navigasi"
+          mode="drawer"
+          dialogId="mc-drawer"
+          onClose={() => setDrawer(false)}
+          headerContent={(
+            <div className="flex items-center gap-2.5">
+              <BrandLogo />
+              <span className="text-[15px] font-bold tracking-tight bg-gradient-to-r from-sky-300 to-violet-300 bg-clip-text text-transparent">Mission Control</span>
+            </div>
+          )}
+        >
+          <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto" aria-label="Panel">
+            {TAB_GROUPS.map(navSection)}
+          </nav>
+          <div className="flex flex-col gap-2.5 border-t border-mc-border pt-3 mt-auto">
+            <span className="mc-fresh">Panel: {activeLabel}</span>
+            {onLogout ? (
+              <button type="button" onClick={onLogout} className="mc-btn-ghost" aria-label="Logout">
+                <LogOut size={13} className="inline mr-1" aria-hidden="true" />
+                Keluar
               </button>
-            </div>
-            <nav
-              className="flex flex-col gap-0.5 flex-1 overflow-y-auto"
-              role="tablist"
-              aria-label="Panel"
-            >
-              {TAB_GROUPS.map(navSection)}
-            </nav>
-            <div className="flex flex-col gap-2.5 border-t border-mc-border pt-3">
-              <span className="mc-fresh">Panel: {activeLabel}</span>
-              {onLogout ? (
-                <button onClick={onLogout} className="mc-btn-ghost" aria-label="Logout">
-                  <LogOut size={13} className="inline mr-1" />
-                  Keluar
-                </button>
-              ) : null}
-            </div>
-          </aside>
-        </>
+            ) : null}
+          </div>
+        </Modal>
       ) : null}
       <main className="flex-1 min-w-0" aria-label="Konten">
         <div className="flex flex-col gap-3.5 p-4 sm:p-5 pb-8 max-w-[1100px] w-full mx-auto">
@@ -4190,10 +4840,10 @@ export function MissionControlApp({ onLogout }) {
                   >
                     <Menu size={19} />
                   </button>
-                  <h1 className="m-0 text-[17px] font-semibold tracking-tight flex items-center gap-2">
+                  <div className="text-[17px] font-semibold tracking-tight flex items-center gap-2">
                     <BrandLogo size="sm" />
                     Mission Control
-                  </h1>
+                  </div>
                 </div>
                 {onLogout ? (
                   <button
@@ -4209,12 +4859,25 @@ export function MissionControlApp({ onLogout }) {
               <div className="mc-fresh -mt-1">Panel aktif: {activeLabel}</div>
             </>
           ) : null}
+          <h1 className="m-0 text-xl sm:text-2xl font-semibold tracking-tight text-mc-text">{activeLabel}</h1>
           {body ? <ErrorBoundary key={tab}>{body}</ErrorBoundary> : null}
           <div className="mc-footnote">
             Sumber data: /opt/data/gateway_state.json · /opt/data/state.db · /opt/data/logs/*.log · opencode.db — semuanya read-only, cache 3–5 dtk di backend. · <SessionChip />
           </div>
         </div>
       </main>
+      {pendingTab ? (
+        <ConfirmModal
+          title="Tinggalkan Routing?"
+          target={tabLabel(pendingTab)}
+          impact="Perubahan JSON yang belum disimpan akan hilang. Pilih Batal untuk kembali dan simpan atau format data terlebih dahulu."
+          confirmLabel="Tinggalkan"
+          confirmIcon={TriangleAlert}
+          confirmClassName="!text-amber-300 !border-amber-400/40"
+          onClose={() => setPendingTab(null)}
+          onConfirm={() => selectTab(pendingTab, { force: true })}
+        />
+      ) : null}
     </div>
   );
 }
@@ -4225,12 +4888,13 @@ function LoginPage({ onLogin }) {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setSubmitted(true);
     setErr(null);
     if (!username.trim() || !password) {
-      setErr("Username dan password wajib diisi.");
       return;
     }
     setBusy(true);
@@ -4244,6 +4908,10 @@ function LoginPage({ onLogin }) {
       setBusy(false);
     }
   }
+
+  const usernameError = submitted && !username.trim() ? "Username wajib diisi." : null;
+  const passwordError = submitted && !password ? "Password wajib diisi." : null;
+  const describedBy = (fieldErrorId) => [fieldErrorId, err ? "login-error" : null].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-mc-bg text-mc-text p-4">
@@ -4263,33 +4931,46 @@ function LoginPage({ onLogin }) {
             <p className="text-xs text-mc-muted mt-2 mb-5">
               Aplikasi mandiri · server :9120 · sesi 12 jam
             </p>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
-              <input
-                className="mc-input"
-                placeholder="Username"
-                value={username}
-                autoComplete="username"
-                onChange={(e) => setUsername(e.target.value)}
-                aria-label="Username"
-              />
-              <input
-                className="mc-input"
-                type="password"
-                placeholder="Password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(e) => setPassword(e.target.value)}
-                aria-label="Password"
-              />
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-2.5" aria-busy={busy}>
+              <label className="text-[11px] text-mc-muted">
+                Username
+                <input
+                  className="mc-input w-full mt-1"
+                  placeholder="Username"
+                  value={username}
+                  autoComplete="username"
+                  onChange={(e) => setUsername(e.target.value)}
+                  aria-label="Username"
+                  aria-invalid={Boolean(usernameError)}
+                  aria-describedby={describedBy(usernameError ? "login-username-error" : null)}
+                />
+                {usernameError ? <Feedback id="login-username-error" kind="err" className="mt-1">{usernameError}</Feedback> : null}
+              </label>
+              <label className="text-[11px] text-mc-muted">
+                Password
+                <input
+                  className="mc-input w-full mt-1"
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  autoComplete="current-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  aria-label="Password"
+                  aria-invalid={Boolean(passwordError)}
+                  aria-describedby={describedBy(passwordError ? "login-password-error" : null)}
+                />
+                {passwordError ? <Feedback id="login-password-error" kind="err" className="mt-1">{passwordError}</Feedback> : null}
+              </label>
               <button
                 type="submit"
                 className="mc-btn-primary mt-1 w-full"
                 disabled={busy}
+                aria-busy={busy}
               >
                 {busy ? "Memeriksa…" : "Masuk"}
               </button>
             </form>
-            {err ? <div className="mc-err">{err}</div> : null}
+            {err ? <Feedback id="login-error" kind="err">{err}</Feedback> : null}
           </div>
         </div>
       </div>
@@ -4310,7 +4991,7 @@ export default function Root() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => setAuth("out"));
-    apiFetch("/api/overview")
+    safeFetchJSON("/api/overview")
       .then(() => setAuth("in"))
       .catch((e) => {
         // 401 -> halaman login; error lain (mis. server down) -> tetap buka dashboard
@@ -4320,7 +5001,7 @@ export default function Root() {
   }, []);
 
   if (auth === "checking") return <CheckingScreen />;
-  if (auth === "out") return <LoginPage onLogin={() => setAuth("in")} />;
+  if (auth === "out") return <LoginPage onLogin={() => { resetUnauthorizedNotice(); setAuth("in"); }} />;
   return (
     <MissionControlApp
       onLogout={async () => {
