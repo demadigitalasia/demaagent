@@ -1,0 +1,112 @@
+{
+  "schema_id": "dema-user-gateway-contract/v1",
+  "version": "1.0.0",
+  "title": "DEMA User Gateway Identity and Routing Foundation Contract",
+  "status": "not_enabled_yet",
+  "scope": "Pure policy contract for a future tenant-scoped business gateway; no transport, persistence, public route, or runtime activation is included.",
+  "identity_contract": {
+    "telegram_user_id": {
+      "type": "string",
+      "format": "ascii_digits",
+      "min_length": 1,
+      "max_length": 20,
+      "preserve_literal": true,
+      "normalization": "none"
+    },
+    "required_internal_fields": [
+      "user_id",
+      "tenant_id",
+      "role",
+      "status"
+    ],
+    "status_values": [
+      "active",
+      "pending",
+      "suspended",
+      "disabled"
+    ],
+    "mapping_rules": [
+      "An invalid, unknown, or unmapped Telegram identity is denied.",
+      "Each Telegram identity maps to exactly one explicit user and tenant context.",
+      "Duplicate Telegram mappings and ambiguous user-to-tenant mappings are rejected.",
+      "The platform_admin role belongs to a separate owner/admin boundary and is never granted by Telegram mapping or default registration."
+    ]
+  },
+  "role_definitions": {
+    "user": {
+      "scope": "Own user and tenant business requests only.",
+      "allowed_capability_classes": [
+        "business_request",
+        "catalog_lookup",
+        "request_routing",
+        "proposal_create"
+      ],
+      "platform_control_plane": false
+    },
+    "tenant_admin": {
+      "scope": "Tenant business administration and tenant-scoped business requests only.",
+      "allowed_capability_classes": [
+        "business_request",
+        "catalog_lookup",
+        "request_routing",
+        "proposal_create",
+        "tenant_business_admin"
+      ],
+      "platform_control_plane": false
+    },
+    "platform_admin": {
+      "scope": "Separate owner/admin boundary; not a Telegram User Gateway role.",
+      "allowed_capability_classes": [],
+      "platform_control_plane": false,
+      "granted_by_telegram_mapping": false
+    }
+  },
+  "allowed_capability_classes": [
+    "business_request",
+    "catalog_lookup",
+    "request_routing",
+    "proposal_create",
+    "tenant_business_admin"
+  ],
+  "denied_capability_classes": [
+    "global_memory",
+    "global_skill_library",
+    "roster_mutation",
+    "provider_configuration",
+    "runtime_token_mint_revoke",
+    "coolify_deploy",
+    "mission_control_owner_control_plane",
+    "autonomous_scheduling_cron"
+  ],
+  "route_chain": [
+    "telegram_user",
+    "tenant_boundary",
+    "dema_assistant",
+    "dema_lead",
+    "approved_business_catalog_or_workflow"
+  ],
+  "tenant_context_rules": [
+    "Tenant context is taken only from resolved identity context.",
+    "Request input may be checked against the resolved tenant but cannot select or replace it.",
+    "Cross-tenant access is denied.",
+    "A user role cannot act for another internal user; tenant_admin remains within its tenant."
+  ],
+  "foundation_behavior": [
+    "Only catalog lookup, request routing, tenant-scoped business request, and proposal behavior are modeled.",
+    "All unknown capabilities are denied by default.",
+    "DEMA Assistant and DEMA Lead are routing boundaries only in this foundation contract."
+  ],
+  "not_enabled_yet": [
+    "telegram_webhook",
+    "persistent_identity_database",
+    "public_route",
+    "session_issuance",
+    "tenant_user_data",
+    "runtime_activation"
+  ],
+  "security_invariants": [
+    "This contract does not alter the existing owner control plane or separate runtime API.",
+    "No real user identities, credentials, tokens, secrets, or absolute paths are part of this artifact.",
+    "The existing phase1 readiness proposal and roster remain outside this contract and are not mutated."
+  ]
+}

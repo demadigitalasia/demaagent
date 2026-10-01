@@ -1,0 +1,100 @@
+{
+  "schema_id": "dema-durable-identity-audit/v1",
+  "version": "1.0.0",
+  "title": "DEMA Durable Internal Identity Mapping and Audit Metadata Foundation",
+  "status": "not_enabled_yet",
+  "scope": "Internal SQLite storage contract only; no transport, server wiring, public route, session issuance, or runtime activation.",
+  "implementation": {
+    "module": "business_gateway/identity_store.py",
+    "standard_library_only": true,
+    "database_path_policy": "The caller must supply the SQLite database path explicitly. No default live path is defined and no production database is created by this artifact.",
+    "schema_version": 1,
+    "transaction_boundary": "Mapping mutation and its successful audit event commit atomically or roll back together."
+  },
+  "tables": {
+    "identity_mappings": {
+      "purpose": "Durable internal mapping from one literal Telegram identity to one bounded user and tenant context.",
+      "columns": [
+        "telegram_user_id TEXT PRIMARY KEY",
+        "user_id TEXT NOT NULL",
+        "tenant_id TEXT NOT NULL",
+        "role TEXT NOT NULL",
+        "status TEXT NOT NULL",
+        "created_at TEXT NOT NULL",
+        "updated_at TEXT NOT NULL"
+      ],
+      "allowed_roles": [
+        "user",
+        "tenant_admin"
+      ],
+      "allowed_statuses": [
+        "active",
+        "pending",
+        "suspended",
+        "disabled"
+      ],
+      "invariants": [
+        "Telegram identity is an ASCII digit string of length 1-20 and is preserved literally without normalization.",
+        "Duplicate Telegram mappings are rejected.",
+        "One internal user cannot span incompatible tenant, role, or status contexts.",
+        "platform_admin is outside the Telegram mapping boundary and is rejected.",
+        "Unknown or invalid identity resolution returns no mapping; policy remains deny-by-default."
+      ]
+    },
+    "audit_events": {
+      "purpose": "Bounded audit record for successful identity mapping mutations.",
+      "columns": [
+        "event_id TEXT PRIMARY KEY",
+        "event_timestamp TEXT NOT NULL",
+        "action TEXT NOT NULL",
+        "actor_type TEXT NOT NULL",
+        "actor_id TEXT NOT NULL",
+        "target_type TEXT NOT NULL",
+        "identity_fingerprint TEXT NOT NULL",
+        "result TEXT NOT NULL",
+        "metadata_json TEXT NOT NULL"
+      ],
+      "metadata_boundary": {
+        "max_serialized_bytes": 4096,
+        "top_level_type": "object",
+        "max_nesting_depth": 5,
+        "raw_telegram_user_id_stored": false,
+        "identity_fingerprint": "Lowercase SHA-256 of the literal Telegram identity.",
+        "rejected_value_classes": [
+          "raw Telegram identity values",
+          "password-shaped values",
+          "token-shaped values",
+          "API-key-shaped values",
+          "bearer-shaped values",
+          "credential-shaped values",
+          "sensitive field names"
+        ]
+      },
+      "invariants": [
+        "Audit rows contain a safe fingerprint, never the raw Telegram identity.",
+        "Audit metadata is JSON-compatible, bounded, and validated before commit.",
+        "A failed audit append rolls back the corresponding mapping mutation."
+      ]
+    }
+  },
+  "retention_boundary": {
+    "mapping_records": "No production retention, deletion, or export policy is enabled by this internal foundation.",
+    "audit_events": "No production retention or erasure schedule is enabled; a reviewed policy is required before any live use.",
+    "operational_boundary": "Tests and operations must supply an isolated database path and must not populate this artifact with real identities."
+  },
+  "not_enabled_yet": [
+    "server_wiring",
+    "telegram_webhook",
+    "public_route",
+    "session_issuance",
+    "real_user_records",
+    "tenant_data",
+    "runtime_activation",
+    "autonomous_behavior"
+  ],
+  "security_invariants": [
+    "The module does not modify server.py, plugin_api.py, roster, phase1 readiness, owner auth, runtime ACL, scheduler, cron, provider configuration, or public routes.",
+    "This catalog contains no real identity, secret, credential, bearer value, or absolute filesystem path.",
+    "platform_admin remains in the separate owner/admin boundary and cannot be granted through Telegram mapping."
+  ]
+}

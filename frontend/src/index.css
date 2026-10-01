@@ -1,0 +1,253 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------
+   Mission Control — komponen reusable berbasis Tailwind (dark zinc)
+   ------------------------------------------------------------------ */
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-mc-bg text-mc-text font-sans antialiased;
+    letter-spacing: 0.005em;
+  }
+  ::selection {
+    background: rgba(56, 189, 248, 0.3);
+  }
+}
+
+@layer components {
+  /* kartu panel standar */
+  .mc-card {
+    @apply bg-mc-card border border-mc-border rounded-xl p-4 min-w-0 shadow-card;
+  }
+  .mc-card-hoverable {
+    @apply transition-all duration-200 hover:border-sky-400/50 hover:shadow-glow;
+  }
+
+  /* header kartu */
+  .mc-card-head {
+    @apply flex items-center justify-between gap-2 mb-2.5;
+  }
+  .mc-card-title {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-mc-muted m-0;
+  }
+
+  /* badge status */
+  .mc-badge {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+  }
+  .mc-badge-ok {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+  }
+  .mc-badge-bad {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
+  .mc-badge-warn {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+  }
+  .mc-badge-info {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+    background: rgba(56, 189, 248, 0.14);
+    color: #7dd3fc;
+  }
+  .mc-badge-neutral {
+    @apply inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap;
+    background: rgba(255, 255, 255, 0.07);
+    color: #a1a1aa;
+  }
+
+  /* chip kecil */
+  .mc-chip {
+    @apply inline-block px-2 py-px rounded-md text-[11px] font-medium border border-mc-border bg-white/5 text-mc-muted;
+  }
+
+  /* tombol */
+  .mc-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold cursor-pointer transition-all duration-150 select-none;
+  }
+  .mc-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold cursor-pointer transition-all duration-150 select-none text-sky-300;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(99, 102, 241, 0.22));
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    box-shadow: 0 2px 12px -4px rgba(56, 189, 248, 0.4);
+  }
+  .mc-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.2);
+    box-shadow: 0 2px 18px -4px rgba(56, 189, 248, 0.6);
+  }
+  .mc-btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all duration-150 select-none text-mc-muted bg-transparent border border-mc-border px-2.5 py-1;
+  }
+  .mc-btn-ghost:hover:not(:disabled) {
+    @apply text-mc-text bg-white/5 border-white/20;
+  }
+  .mc-btn-ghost:disabled {
+    @apply opacity-55 cursor-not-allowed;
+  }
+  .mc-btn-primary:disabled {
+    @apply opacity-55 cursor-not-allowed;
+  }
+
+  /* input & select */
+  .mc-input {
+    @apply bg-black/30 border border-mc-border rounded-lg text-mc-text px-3 py-2.5 text-[13px] outline-none flex-1 min-w-[180px] transition-all duration-150;
+  }
+  .mc-input:focus {
+    @apply border-sky-400/60;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  }
+  .mc-btn:focus-visible,
+  .mc-btn-primary:focus-visible,
+  .mc-btn-ghost:focus-visible,
+  .mc-nav-btn:focus-visible,
+  .mc-input:focus-visible,
+  .mc-select:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+  }
+  .mc-select {
+    @apply bg-black/30 border border-mc-border rounded-lg text-mc-text px-2.5 py-2.5 text-[13px] outline-none cursor-pointer transition-all duration-150;
+  }
+  .mc-select:focus {
+    @apply border-sky-400/60;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+  }
+
+  /* tabel */
+  .mc-table {
+    @apply w-full border-collapse text-xs;
+  }
+  .mc-th {
+    @apply text-left text-mc-muted font-semibold px-2.5 py-2 border-b border-mc-border uppercase tracking-wider text-[10.5px] whitespace-nowrap;
+  }
+  .mc-td {
+    @apply px-2.5 py-2.5 border-b border-white/[0.06] text-mc-text font-mono text-[11px] align-top;
+  }
+
+  /* feed / timeline item */
+  .mc-feed-item {
+    @apply flex gap-2.5 rounded-xl p-2.5 bg-white/[0.02] border border-mc-border transition-colors duration-150;
+  }
+  .mc-feed-bar {
+    @apply w-[3px] rounded-sm shrink-0 self-stretch;
+  }
+
+  /* row kunci-nilai */
+  .mc-row {
+    @apply flex justify-between gap-2 py-0.5 text-[13px];
+  }
+  .mc-row-key {
+    @apply text-mc-muted shrink-0;
+  }
+  .mc-row-val {
+    @apply font-mono text-xs text-right break-all;
+  }
+
+  .mc-fresh {
+    @apply font-mono text-xs text-mc-muted;
+  }
+
+  /* pesan */
+  .mc-err {
+    @apply text-red-400 text-xs mt-2 break-words;
+  }
+  .mc-ok {
+    @apply text-green-400 text-xs mt-2 break-words;
+  }
+  .mc-empty {
+    @apply text-mc-faint text-[13px] py-2.5;
+  }
+  .mc-footnote {
+    @apply text-[11px] text-mc-faint mt-1;
+  }
+
+  /* memory pre */
+  .mc-mem-pre {
+    @apply font-mono text-[11.5px] leading-relaxed text-mc-text whitespace-pre-wrap break-words max-h-[280px] overflow-y-auto m-0 bg-black/25 border border-mc-border rounded-lg p-2.5;
+  }
+
+  /* nav sidebar */
+  .mc-nav-btn {
+    @apply flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-[13px] font-medium text-mc-muted bg-transparent border-none cursor-pointer text-left transition-all duration-150;
+  }
+  .mc-nav-btn:hover {
+    @apply bg-white/5 text-mc-text;
+  }
+  .mc-nav-btn-active {
+    @apply text-sky-300 bg-sky-400/10;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25), 0 0 14px -6px rgba(56, 189, 248, 0.5);
+  }
+  .mc-section-label {
+    @apply text-[10px] font-bold uppercase tracking-widest text-mc-faint px-2.5 pt-2.5 pb-1;
+  }
+
+  /* grid agent & panel */
+  .mc-agent-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .mc-panel-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  /* kartu agent premium */
+  .mc-agent-card {
+    @apply bg-gradient-to-b from-mc-card2 to-mc-card border border-mc-border rounded-2xl p-4 flex flex-col gap-2.5 min-w-0 transition-all duration-200 hover:border-sky-400/50 hover:shadow-glow hover:-translate-y-px;
+  }
+
+  /* avatar inisial bernuansa hue */
+  .mc-avatar {
+    @apply w-[38px] h-[38px] rounded-[10px] shrink-0 flex items-center justify-center text-[15px] font-bold;
+    border: 1px solid transparent;
+  }
+  .mc-avatar-h0 { color: #38bdf8; background: linear-gradient(135deg, #38bdf833, #38bdf818); border-color: #38bdf844; }
+  .mc-avatar-h1 { color: #a78bfa; background: linear-gradient(135deg, #a78bfa33, #a78bfa18); border-color: #a78bfa44; }
+  .mc-avatar-h2 { color: #f472b6; background: linear-gradient(135deg, #f472b633, #f472b618); border-color: #f472b644; }
+  .mc-avatar-h3 { color: #4ade80; background: linear-gradient(135deg, #4ade8033, #4ade8018); border-color: #4ade8044; }
+  .mc-avatar-h4 { color: #fbbf24; background: linear-gradient(135deg, #fbbf2433, #fbbf2418); border-color: #fbbf2444; }
+  .mc-avatar-h5 { color: #fb7185; background: linear-gradient(135deg, #fb718533, #fb718518); border-color: #fb718544; }
+  .mc-avatar-h6 { color: #34d399; background: linear-gradient(135deg, #34d39933, #34d39918); border-color: #34d39944; }
+
+  /* blok model mono */
+  .mc-model-block {
+    @apply font-mono text-[11px] text-mc-faint break-all bg-black/25 border border-mc-border rounded-lg px-2 py-1.5;
+  }
+
+  /* spinner */
+  .mc-spinner {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid #27272a;
+    border-top-color: #38bdf8;
+    animation: mc-spin 0.8s linear infinite;
+  }
+}
+
+@keyframes mc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mc-drawer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

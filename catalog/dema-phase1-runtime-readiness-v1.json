@@ -1,0 +1,452 @@
+{
+  "schema_id": "dema-phase1-runtime-readiness/v1",
+  "version": "1.0.0",
+  "title": "DEMA Phase 1 Business Runtime Readiness Proposal",
+  "documented_on": "2026-10-01",
+  "scope": "Readiness gate and recommendation for eight business candidates; this artifact is not provisioning and does not assert runtime readiness.",
+  "candidate_entries": [
+    {
+      "id": "dema-assistant",
+      "display_name": "DEMA Assistant",
+      "kind": "orchestrator",
+      "domain": "entry",
+      "parent": null,
+      "purpose": "Public entry point that receives a user request, applies routing boundaries, and hands work to approved DEMA capabilities.",
+      "source_catalog_ids": ["dema-assistant"],
+      "proposed_runtime_owner": "future-dema-assistant-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Use only a model present in the verified provider/model catalog after the provider and model decision is approved."
+      },
+      "tools": ["bounded_request_routing", "bounded_handoff", "readiness_catalog_lookup"],
+      "skills": ["orchestration", "tenant_boundary", "human_handoff"],
+      "knowledge_scope": ["10-Wiki/business/approved", "tenant_scoped_context"],
+      "permission_boundary": "Tenant-scoped request intake and routing only; no cross-tenant access, roster mutation, runtime activation, or unapproved external action.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-lead",
+      "display_name": "DEMA Lead",
+      "kind": "orchestrator",
+      "domain": "coordination",
+      "parent": "dema-assistant",
+      "purpose": "Coordinates approved domain work, preserves human approval boundaries, and returns a bounded result to the entry point.",
+      "source_catalog_ids": ["dema-lead"],
+      "proposed_runtime_owner": "future-dema-lead-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Use only a model present in the verified provider/model catalog after the provider and model decision is approved."
+      },
+      "tools": ["bounded_handoff", "approval_gate_lookup", "readiness_catalog_lookup"],
+      "skills": ["orchestration", "decision_routing", "human_handoff"],
+      "knowledge_scope": ["10-Wiki/business/approved", "tenant_scoped_context"],
+      "permission_boundary": "Coordinates only within the requesting tenant and approved capability graph; cannot activate candidates or change platform configuration.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-support",
+      "display_name": "DEMA Support",
+      "kind": "domain_agent",
+      "domain": "support",
+      "parent": "dema-lead",
+      "purpose": "Handles bounded support intake, triage, and response drafting using approved support knowledge.",
+      "source_catalog_ids": ["dema-support"],
+      "proposed_runtime_owner": "future-dema-support-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Select a verified provider/model only after the support persona and tool contract are approved."
+      },
+      "tools": ["bounded_ticket_triage", "response_draft", "human_handoff"],
+      "skills": ["support_triage", "knowledge_retrieval", "response_drafting"],
+      "knowledge_scope": ["10-Wiki/business/support", "tenant_scoped_context"],
+      "permission_boundary": "May read approved support knowledge for the requesting tenant and draft responses; no customer-record mutation or external send without approval.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-sales",
+      "display_name": "DEMA Sales",
+      "kind": "domain_agent",
+      "domain": "sales",
+      "parent": "dema-lead",
+      "purpose": "Supports bounded lead qualification, sales research, and draft follow-up within an approved tenant boundary.",
+      "source_catalog_ids": ["dema-sales"],
+      "proposed_runtime_owner": "future-dema-sales-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Select a verified provider/model only after sales persona, tool, and data-use decisions are approved."
+      },
+      "tools": ["bounded_lead_qualification", "sales_research", "follow_up_draft"],
+      "skills": ["sales_qualification", "knowledge_retrieval", "response_drafting"],
+      "knowledge_scope": ["10-Wiki/business/sales", "tenant_scoped_context"],
+      "permission_boundary": "May work with approved tenant sales context and draft outputs; no CRM write, outreach, or pricing commitment without approval.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-crm",
+      "display_name": "DEMA CRM",
+      "kind": "domain_agent",
+      "domain": "crm",
+      "parent": "dema-lead",
+      "purpose": "Proposes bounded CRM lookup, record summarization, and next-action drafts without assuming write access.",
+      "source_catalog_ids": ["dema-crm"],
+      "proposed_runtime_owner": "future-dema-crm-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Select a verified provider/model only after CRM data boundary and tool contract are approved."
+      },
+      "tools": ["bounded_crm_lookup", "record_summary", "next_action_draft"],
+      "skills": ["crm_operations", "knowledge_retrieval", "response_drafting"],
+      "knowledge_scope": ["10-Wiki/business/crm", "tenant_scoped_context"],
+      "permission_boundary": "Read-only proposal boundary for approved tenant CRM context; no record mutation, export, or cross-tenant lookup.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-commerce",
+      "display_name": "DEMA Commerce",
+      "kind": "domain_agent",
+      "domain": "commerce",
+      "parent": "dema-lead",
+      "purpose": "Owns the proposed commerce domain boundary and coordinates bounded order and booking workflows.",
+      "source_catalog_ids": ["dema-commerce"],
+      "proposed_runtime_owner": "future-dema-commerce-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Select a verified provider/model only after commerce persona, workflow, tool, and quota decisions are approved."
+      },
+      "tools": ["bounded_order_intake", "bounded_booking_intake", "commerce_handoff"],
+      "skills": ["commerce_orchestration", "order_workflow", "booking_workflow"],
+      "knowledge_scope": ["10-Wiki/business/commerce", "tenant_scoped_context"],
+      "permission_boundary": "Tenant-scoped commerce coordination only; no transaction, inventory, calendar, or customer-record mutation without explicit approval.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-order",
+      "display_name": "DEMA Order",
+      "kind": "workflow",
+      "domain": "commerce",
+      "parent": "dema-commerce",
+      "purpose": "Bounded commerce workflow for order intake, validation, and human-review handoff under DEMA Commerce.",
+      "source_catalog_ids": ["dema-order"],
+      "proposed_runtime_owner": "future-dema-commerce-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "inherits_parent_pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Shares the approved Commerce runtime owner initially; it is not a separate top-level runtime candidate."
+      },
+      "tools": ["bounded_order_intake", "order_summary", "human_handoff"],
+      "skills": ["order_workflow", "knowledge_retrieval", "human_handoff"],
+      "knowledge_scope": ["10-Wiki/business/commerce/orders", "tenant_scoped_context"],
+      "permission_boundary": "Workflow-scoped order proposal only; no payment, fulfillment, inventory, or order mutation capability is implied.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    },
+    {
+      "id": "dema-booking",
+      "display_name": "DEMA Booking",
+      "kind": "workflow",
+      "domain": "commerce",
+      "parent": "dema-commerce",
+      "purpose": "Bounded commerce workflow for booking intake, availability questions, and human-review handoff under DEMA Commerce.",
+      "source_catalog_ids": ["dema-booking"],
+      "proposed_runtime_owner": "future-dema-commerce-runtime",
+      "proposed_provider_model_policy": {
+        "selection": "inherits_parent_pending_explicit_approval",
+        "model_assignment": "not_selected",
+        "selection_rule": "Shares the approved Commerce runtime owner initially; it is not a separate top-level runtime candidate."
+      },
+      "tools": ["bounded_booking_intake", "availability_question", "human_handoff"],
+      "skills": ["booking_workflow", "knowledge_retrieval", "human_handoff"],
+      "knowledge_scope": ["10-Wiki/business/commerce/bookings", "tenant_scoped_context"],
+      "permission_boundary": "Workflow-scoped booking proposal only; no calendar, reservation, payment, or booking mutation capability is implied.",
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "lifecycle": {
+        "state": "design_candidate",
+        "design_candidate": true,
+        "configured": false,
+        "tested": false,
+        "on_demand_ready": false,
+        "approved_for_users": false,
+        "active": false
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "provider_model_selection",
+      "description": "Select a provider and exact model from a verified catalog; no candidate receives a model assignment in this proposal.",
+      "required_before": "configured"
+    },
+    {
+      "id": "persona_contract",
+      "description": "Approve each candidate persona, input contract, output contract, escalation rule, and human handoff behavior.",
+      "required_before": "tested"
+    },
+    {
+      "id": "tool_contract",
+      "description": "Define and approve the bounded tool surface, read/write behavior, failure modes, and external-action confirmation rules.",
+      "required_before": "tested"
+    },
+    {
+      "id": "knowledge_boundary",
+      "description": "Approve tenant-scoped knowledge sources, retrieval limits, provenance requirements, and separation from platform-internal context.",
+      "required_before": "tested"
+    },
+    {
+      "id": "tenant_isolation",
+      "description": "Demonstrate caller-to-tenant mapping and prevent cross-tenant reads, writes, memory access, and workflow leakage.",
+      "required_before": "on_demand_ready"
+    },
+    {
+      "id": "bounded_smoke",
+      "description": "Run a bounded on-demand smoke with synthetic or approved fixture data and no live business action.",
+      "required_before": "on_demand_ready"
+    },
+    {
+      "id": "cost_quota",
+      "description": "Set cost, token, rate, and concurrency limits with an observable refusal path before user approval.",
+      "required_before": "approved_for_users"
+    },
+    {
+      "id": "audit",
+      "description": "Define auditable decision, handoff, tool, approval, and failure events without recording sensitive values.",
+      "required_before": "approved_for_users"
+    },
+    {
+      "id": "human_approval",
+      "description": "Obtain explicit product and rollout approval for the candidate set, runtime ownership, permissions, and user exposure.",
+      "required_before": "approved_for_users"
+    }
+  ],
+  "acceptance_gates": [
+    {
+      "id": "provider_model_selection",
+      "description": "Exact provider/model policy is selected and recorded from the verified catalog.",
+      "evidence": "Approved decision record and a non-secret exact model reference.",
+      "status": "not_started"
+    },
+    {
+      "id": "persona_contract",
+      "description": "Persona and input/output contracts are reviewed for every proposed runtime owner and workflow.",
+      "evidence": "Reviewed contract notes with escalation and refusal behavior.",
+      "status": "not_started"
+    },
+    {
+      "id": "tool_contract",
+      "description": "Tool names, scopes, confirmation requirements, and error handling are bounded and tested.",
+      "evidence": "Tool contract and negative-path test results.",
+      "status": "not_started"
+    },
+    {
+      "id": "knowledge_boundary",
+      "description": "Knowledge scope is approved and cannot cross tenant or platform boundaries.",
+      "evidence": "Scope matrix and isolation test results.",
+      "status": "not_started"
+    },
+    {
+      "id": "tenant_isolation",
+      "description": "Two-tenant read and write checks show that one tenant cannot access another tenant's context.",
+      "evidence": "Bounded isolation test report.",
+      "status": "not_started"
+    },
+    {
+      "id": "bounded_smoke",
+      "description": "Each approved runtime owner passes a bounded on-demand smoke without live business side effects.",
+      "evidence": "Reproducible smoke command and output using approved fixtures.",
+      "status": "not_started"
+    },
+    {
+      "id": "cost_quota",
+      "description": "Budget, rate, token, and concurrency behavior is configured and refusal is observable.",
+      "evidence": "Quota configuration review and limit tests.",
+      "status": "not_started"
+    },
+    {
+      "id": "audit",
+      "description": "Required lifecycle, approval, handoff, and tool events are auditable without sensitive values.",
+      "evidence": "Audit event schema and redaction checks.",
+      "status": "not_started"
+    },
+    {
+      "id": "human_approval",
+      "description": "A human approves product scope, runtime roster recommendation, permission boundary, and release target.",
+      "evidence": "Explicit approval record for the next rollout step.",
+      "status": "not_started"
+    }
+  ],
+  "workflow_mapping": {
+    "dema-order": {
+      "parent": "dema-commerce",
+      "mapping_type": "workflow_under_commerce",
+      "top_level_runtime_agent": false,
+      "reason": "Order is a bounded commerce workflow and shares the Commerce lifecycle initially."
+    },
+    "dema-booking": {
+      "parent": "dema-commerce",
+      "mapping_type": "workflow_under_commerce",
+      "top_level_runtime_agent": false,
+      "reason": "Booking is a bounded commerce workflow and shares the Commerce lifecycle initially."
+    }
+  },
+  "non_goals": [
+    "roster mutation: do not add, remove, or edit existing entries in agents.json.",
+    "autonomous runtime: do not create a scheduler, cron, profile, persistent MCP configuration, or autonomous business process.",
+    "public release: do not expose these candidates to public or multi-user traffic.",
+    "personal-agent provisioning: do not create tenant users, personal agents, or private workspaces.",
+    "live business execution: do not send messages, mutate orders, create bookings, or perform external business actions.",
+    "frontend or API expansion: do not add a dashboard route or UI for this readiness artifact."
+  ],
+  "proposed_runtime_roster": {
+    "status": "recommendation_only_not_provisioned",
+    "provisioning": "recommendation_only_not_provisioned",
+    "recommendation_only_not_provisioned": true,
+    "rows": [
+      {
+        "candidate_id": "dema-assistant",
+        "runtime_role": "public_entry",
+        "provisioning": "recommendation_only_not_provisioned"
+      },
+      {
+        "candidate_id": "dema-lead",
+        "runtime_role": "orchestrator",
+        "provisioning": "recommendation_only_not_provisioned"
+      },
+      {
+        "candidate_id": "dema-support",
+        "runtime_role": "domain_agent",
+        "provisioning": "recommendation_only_not_provisioned"
+      },
+      {
+        "candidate_id": "dema-sales",
+        "runtime_role": "domain_agent",
+        "provisioning": "recommendation_only_not_provisioned"
+      },
+      {
+        "candidate_id": "dema-crm",
+        "runtime_role": "domain_agent",
+        "provisioning": "recommendation_only_not_provisioned"
+      },
+      {
+        "candidate_id": "dema-commerce",
+        "runtime_role": "domain_agent",
+        "workflow_children": ["dema-order", "dema-booking"],
+        "provisioning": "recommendation_only_not_provisioned"
+      }
+    ],
+    "workflow_exclusions": ["dema-order", "dema-booking"],
+    "notes": "This recommendation does not create runtime identities and must receive a separate rollout approval before any provisioning decision."
+  },
+  "frozen_existing_roster_guard": {
+    "count": 9,
+    "ids": [
+      "hermes-lead",
+      "agent-engineer",
+      "opencode",
+      "agent-socmed",
+      "news-agent",
+      "sub-agent-back-end",
+      "sub-agent-devops",
+      "sub-agent-front-end",
+      "sub-agent-ui-ux"
+    ],
+    "model_assignments": {
+      "hermes-lead": "openai-codex/gpt-5.6-luna",
+      "agent-engineer": "openai-codex/gpt-5.6-luna",
+      "opencode": "opencode-go/deepseek-v4-flash",
+      "agent-socmed": "opencode-go/deepseek-v4-flash",
+      "news-agent": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "sub-agent-back-end": "opencode-go/deepseek-v4-flash",
+      "sub-agent-devops": "opencode-go/deepseek-v4-flash",
+      "sub-agent-front-end": "opencode-go/deepseek-v4-flash",
+      "sub-agent-ui-ux": "opencode-go/deepseek-v4-flash-vision-exp"
+    },
+    "active_flags": {
+      "hermes-lead": false,
+      "agent-engineer": false,
+      "opencode": false,
+      "agent-socmed": false,
+      "news-agent": false,
+      "sub-agent-back-end": false,
+      "sub-agent-devops": false,
+      "sub-agent-front-end": false,
+      "sub-agent-ui-ux": false
+    },
+    "namespace_count": 8,
+    "status": "guard_only_not_mutated"
+  }
+}

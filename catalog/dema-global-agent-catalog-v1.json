@@ -1,0 +1,1909 @@
+{
+  "schema_id": "dema-global-agent-catalog/v1",
+  "version": "1.0.0",
+  "title": "DEMA Global Agent Catalog v1",
+  "documented_on": "2026-10-01",
+  "scope": "Global product and architecture catalog; not a runtime rollout manifest.",
+  "design_sources": [
+    {
+      "id": "business_roster_v1",
+      "label": "DEMA business roster",
+      "names": [
+        "DEMA Lead",
+        "Support",
+        "Sales",
+        "Order",
+        "CRM",
+        "Marketing",
+        "Social",
+        "Content",
+        "Analyst",
+        "Finance",
+        "Booking",
+        "Document",
+        "Operations",
+        "Inventory",
+        "Procurement",
+        "HR",
+        "Recruiter",
+        "Project",
+        "Meeting"
+      ]
+    },
+    {
+      "id": "product_catalog_v2",
+      "label": "DEMA product catalog",
+      "names": [
+        "DEMA Social",
+        "Content",
+        "Analyst",
+        "Finance",
+        "Booking",
+        "Document",
+        "Operations",
+        "Inventory",
+        "Procurement",
+        "HR",
+        "Recruiter",
+        "Project",
+        "Meeting",
+        "Email",
+        "Assistant",
+        "Research",
+        "Commerce",
+        "Retention",
+        "Review",
+        "Report"
+      ]
+    }
+  ],
+  "source_mappings": [
+    {
+      "source_set": "business_roster",
+      "source_name": "DEMA Lead",
+      "catalog_id": "dema-lead",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Support",
+      "catalog_id": "dema-support",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Sales",
+      "catalog_id": "dema-sales",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Order",
+      "catalog_id": "dema-order",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "CRM",
+      "catalog_id": "dema-crm",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Marketing",
+      "catalog_id": "dema-marketing",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Social",
+      "catalog_id": "dema-social",
+      "mapping_type": "alias",
+      "reason": "Explicit alias or workflow mapping retained from the source design."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Content",
+      "catalog_id": "dema-content",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Analyst",
+      "catalog_id": "dema-analyst",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Finance",
+      "catalog_id": "dema-finance",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Booking",
+      "catalog_id": "dema-booking",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Document",
+      "catalog_id": "dema-document",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Operations",
+      "catalog_id": "dema-operations",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Inventory",
+      "catalog_id": "dema-inventory",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Procurement",
+      "catalog_id": "dema-procurement",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "HR",
+      "catalog_id": "dema-hr",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Recruiter",
+      "catalog_id": "dema-recruiter",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Project",
+      "catalog_id": "dema-project",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "business_roster",
+      "source_name": "Meeting",
+      "catalog_id": "dema-meeting",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "DEMA Social",
+      "catalog_id": "dema-social",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Content",
+      "catalog_id": "dema-content",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Analyst",
+      "catalog_id": "dema-analyst",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Finance",
+      "catalog_id": "dema-finance",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Booking",
+      "catalog_id": "dema-booking",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Document",
+      "catalog_id": "dema-document",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Operations",
+      "catalog_id": "dema-operations",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Inventory",
+      "catalog_id": "dema-inventory",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Procurement",
+      "catalog_id": "dema-procurement",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "HR",
+      "catalog_id": "dema-hr",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Recruiter",
+      "catalog_id": "dema-recruiter",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Project",
+      "catalog_id": "dema-project",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Meeting",
+      "catalog_id": "dema-meeting",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Email",
+      "catalog_id": "dema-email",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Assistant",
+      "catalog_id": "dema-assistant",
+      "mapping_type": "alias",
+      "reason": "Explicit alias or workflow mapping retained from the source design."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Research",
+      "catalog_id": "dema-research",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Commerce",
+      "catalog_id": "dema-commerce",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Retention",
+      "catalog_id": "dema-retention",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Review",
+      "catalog_id": "dema-review",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    },
+    {
+      "source_set": "product_catalog",
+      "source_name": "Report",
+      "catalog_id": "dema-report",
+      "mapping_type": "canonical",
+      "reason": "Canonical product/domain label."
+    }
+  ],
+  "recommended_runtime_roster": [
+    {
+      "id": "dema-assistant",
+      "display_name": "DEMA Assistant",
+      "kind": "orchestrator",
+      "runtime_owner": "hermes-lead",
+      "provisioning": "recommendation_only_not_provisioned",
+      "reason": "Public entry point layered over the existing coordinator."
+    },
+    {
+      "id": "dema-lead",
+      "display_name": "DEMA Lead",
+      "kind": "orchestrator",
+      "runtime_owner": "hermes-lead",
+      "provisioning": "recommendation_only_not_provisioned",
+      "reason": "Business orchestration role; not a new agents.json row."
+    },
+    {
+      "id": "dema-social",
+      "display_name": "DEMA Social",
+      "kind": "domain_agent",
+      "runtime_owner": "agent-socmed",
+      "provisioning": "recommendation_only_not_provisioned",
+      "reason": "Maps the product capability to the existing social runtime."
+    },
+    {
+      "id": "dema-research",
+      "display_name": "Research",
+      "kind": "workflow",
+      "runtime_owner": "news-agent",
+      "provisioning": "recommendation_only_not_provisioned",
+      "reason": "Keeps research as a workflow over the existing briefing runtime."
+    },
+    {
+      "id": "dema-business-workflows",
+      "display_name": "DEMA Business Workflows",
+      "kind": "workflow",
+      "runtime_owner": "hermes-lead",
+      "provisioning": "recommendation_only_not_provisioned",
+      "reason": "Shared workflow surface; individual workflows do not become autonomous processes by default."
+    }
+  ],
+  "frozen_runtime_guard": {
+    "count": 9,
+    "ids": [
+      "hermes-lead",
+      "agent-engineer",
+      "opencode",
+      "agent-socmed",
+      "news-agent",
+      "sub-agent-back-end",
+      "sub-agent-devops",
+      "sub-agent-front-end",
+      "sub-agent-ui-ux"
+    ],
+    "active_flags": {
+      "hermes-lead": false,
+      "agent-engineer": false,
+      "opencode": false,
+      "agent-socmed": false,
+      "news-agent": false,
+      "sub-agent-back-end": false,
+      "sub-agent-devops": false,
+      "sub-agent-front-end": false,
+      "sub-agent-ui-ux": false
+    },
+    "namespace_count": 8
+  },
+  "boundary": {
+    "catalog_is_not_runtime_count": true,
+    "public_catalog_is_global": true,
+    "personal_agent_scope": "tenant_user_scope_later",
+    "autonomous_runtime_default": false,
+    "agents_json_mutation": false,
+    "scheduler_mutation": false,
+    "cron_mutation": false,
+    "profile_mutation": false,
+    "provider_state_unchanged": true,
+    "authentication_mutation": false,
+    "read_only_architecture_artifact": true,
+    "pending_proposals_policy": "catalog_work_does_not_create_or_promote_proposals",
+    "notes": "User-visible product catalog count is not a process count. Global catalog entries do not create autonomous agents. Personal agents belong to tenant/user scope and require separate product approval."
+  },
+  "catalog_entries": [
+    {
+      "id": "hermes-lead",
+      "display_name": "Hermes Lead",
+      "kind": "platform_internal",
+      "domain": "platform-orchestration",
+      "purpose": "Koordinator control-plane yang menerima instruksi user, menggabungkan hasil, dan melakukan verifikasi akhir.",
+      "primary_inputs": [
+        "user_instruction",
+        "acceptance_criteria",
+        "verified_system_evidence"
+      ],
+      "primary_outputs": [
+        "delegation_brief",
+        "verified_report",
+        "approval_boundary"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": null,
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_coordinator",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "existing_runtime_only"
+      },
+      "skills": [
+        "hermes-agent",
+        "mission-control",
+        "grounded-citations",
+        "llm-wiki"
+      ],
+      "tools": [
+        "mission-control_read",
+        "delegation_control",
+        "verification_runner"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/hermes-lead"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Entity runtime existing; bukan katalog bisnis baru dan tetap on-demand.",
+      "runtime_owner_reason": "Self-owned coordinator row in the frozen nine-entity runtime roster."
+    },
+    {
+      "id": "agent-engineer",
+      "display_name": "Agent Engineer",
+      "kind": "platform_internal",
+      "domain": "platform-engineering",
+      "purpose": "Technical lead sub-agent untuk implementasi, testing, debugging, dan review repository yang didelegasikan.",
+      "primary_inputs": [
+        "delegated_engineering_goal",
+        "repository_context",
+        "acceptance_criteria"
+      ],
+      "primary_outputs": [
+        "implementation_diff",
+        "test_evidence",
+        "engineering_report"
+      ],
+      "runtime_owner": "agent-engineer",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_delegated",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_task_only"
+      },
+      "skills": [
+        "agent-engineer",
+        "test-driven-development",
+        "systematic-debugging",
+        "mission-control"
+      ],
+      "tools": [
+        "repository_read",
+        "bounded_coding_executor",
+        "test_runner"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/agent-engineer"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Sub-agent engineering existing; tidak menjadi public/business agent.",
+      "runtime_owner_reason": "Self-owned engineering runtime row under hermes-lead."
+    },
+    {
+      "id": "opencode",
+      "display_name": "OpenCode",
+      "kind": "platform_internal",
+      "domain": "platform-execution",
+      "purpose": "Executor CLI untuk menjalankan task coding yang sudah didefinisikan Lead atau Agent Engineer.",
+      "primary_inputs": [
+        "explicit_executor_task",
+        "bounded_repository_scope"
+      ],
+      "primary_outputs": [
+        "code_change",
+        "command_output",
+        "failure_signal"
+      ],
+      "runtime_owner": "opencode",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "executor_only",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "one_shot_bounded"
+      },
+      "skills": [
+        "opencode"
+      ],
+      "tools": [
+        "bounded_command_execution",
+        "repository_write"
+      ],
+      "knowledge_scope": [
+        "10-Wiki"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Executor-only; tidak memiliki private knowledge namespace dan tidak mengambil keputusan produk.",
+      "runtime_owner_reason": "Self-owned executor row in the frozen runtime roster."
+    },
+    {
+      "id": "sub-agent-back-end",
+      "display_name": "Sub Agent Back End",
+      "kind": "platform_internal",
+      "domain": "platform-backend",
+      "purpose": "Spesialis backend di bawah Agent Engineer untuk API, database, validasi, dan testing.",
+      "primary_inputs": [
+        "backend_task",
+        "repository_context",
+        "test_contract"
+      ],
+      "primary_outputs": [
+        "backend_change",
+        "focused_tests",
+        "regression_report"
+      ],
+      "runtime_owner": "sub-agent-back-end",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_delegated",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_task_only"
+      },
+      "skills": [
+        "test-driven-development",
+        "systematic-debugging",
+        "mission-control"
+      ],
+      "tools": [
+        "repository_read",
+        "api_test_runner",
+        "database_read"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/sub-agent-back-end"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Internal implementation specialist; bukan public catalog entry.",
+      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+    },
+    {
+      "id": "sub-agent-devops",
+      "display_name": "Sub Agent DevOps",
+      "kind": "platform_internal",
+      "domain": "platform-operations",
+      "purpose": "Spesialis infrastructure, deployment, monitoring, dan server di bawah Agent Engineer.",
+      "primary_inputs": [
+        "infrastructure_task",
+        "deployment_context",
+        "verification_contract"
+      ],
+      "primary_outputs": [
+        "operations_change",
+        "health_evidence",
+        "rollback_signal"
+      ],
+      "runtime_owner": "sub-agent-devops",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_delegated",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_task_only"
+      },
+      "skills": [
+        "coolify",
+        "mission-control",
+        "github-release-binary-install"
+      ],
+      "tools": [
+        "health_probe",
+        "deployment_read",
+        "log_read"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/sub-agent-devops"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Internal operations specialist; tidak membuat scheduler atau runtime baru dari katalog ini.",
+      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+    },
+    {
+      "id": "sub-agent-front-end",
+      "display_name": "Sub Agent Front End",
+      "kind": "platform_internal",
+      "domain": "platform-frontend",
+      "purpose": "Spesialis React/Vite/Tailwind, state API, responsive UI, dan accessibility di bawah Agent Engineer.",
+      "primary_inputs": [
+        "frontend_task",
+        "existing_ui_pattern",
+        "acceptance_criteria"
+      ],
+      "primary_outputs": [
+        "frontend_change",
+        "build_evidence",
+        "ui_regression_report"
+      ],
+      "runtime_owner": "sub-agent-front-end",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_delegated",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_task_only"
+      },
+      "skills": [
+        "mission-control",
+        "dogfood",
+        "design-md"
+      ],
+      "tools": [
+        "frontend_build",
+        "dom_read",
+        "browser_probe"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/sub-agent-front-end"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Internal frontend specialist; catalog v1 tidak menyentuh UI.",
+      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+    },
+    {
+      "id": "sub-agent-ui-ux",
+      "display_name": "Sub Agent UI UX",
+      "kind": "platform_internal",
+      "domain": "platform-design",
+      "purpose": "Spesialis design system, layout, mobile-first, accessibility, dan usability di bawah Agent Engineer.",
+      "primary_inputs": [
+        "design_task",
+        "existing_design_pattern",
+        "responsive_acceptance_criteria"
+      ],
+      "primary_outputs": [
+        "design_guidance",
+        "ui_review",
+        "accessibility_findings"
+      ],
+      "runtime_owner": "sub-agent-ui-ux",
+      "parent": "agent-engineer",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_delegated",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_task_only"
+      },
+      "skills": [
+        "claude-design",
+        "design-md",
+        "popular-web-designs"
+      ],
+      "tools": [
+        "design_review",
+        "browser_probe",
+        "accessibility_read"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/sub-agent-ui-ux"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Internal design specialist; tidak menjadi public/business runtime.",
+      "runtime_owner_reason": "Self-owned specialist row under agent-engineer."
+    },
+    {
+      "id": "dema-assistant",
+      "display_name": "DEMA Assistant",
+      "kind": "orchestrator",
+      "domain": "assistant",
+      "purpose": "Entry point untuk kebutuhan user yang mengklasifikasikan intent dan meneruskan pekerjaan ke DEMA Lead atau workflow yang sesuai.",
+      "primary_inputs": [
+        "user_request",
+        "tenant_context",
+        "approval_state"
+      ],
+      "primary_outputs": [
+        "routed_request",
+        "clarification_request",
+        "handoff_record"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": null,
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "mission-control",
+        "grounded-citations"
+      ],
+      "tools": [
+        "catalog_router",
+        "approval_queue",
+        "tenant_context"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/assistant"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Global catalog surface only; belum menjadi process runtime mandiri.",
+      "runtime_owner_reason": "Shared hermes-lead coordinator owns the public entry point until an approved tenant runtime exists."
+    },
+    {
+      "id": "dema-lead",
+      "display_name": "DEMA Lead",
+      "kind": "orchestrator",
+      "domain": "business-orchestration",
+      "purpose": "Orkestrator bisnis yang memecah permintaan menjadi domain work atau workflow dan menggabungkan hasil terverifikasi.",
+      "primary_inputs": [
+        "assistant_handoff",
+        "business_request",
+        "approval_state"
+      ],
+      "primary_outputs": [
+        "execution_plan",
+        "domain_handoff",
+        "verified_business_result"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-assistant",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "mission-control",
+        "grounded-citations"
+      ],
+      "tools": [
+        "workflow_router",
+        "approval_queue",
+        "verification_runner"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Nama public DEMA Lead tidak sama dengan entity hermes-lead; ini mapping produk, bukan roster row baru.",
+      "runtime_owner_reason": "Existing hermes-lead is the sole coordinator owner; no second runtime owner is introduced."
+    },
+    {
+      "id": "dema-support",
+      "display_name": "Support",
+      "kind": "domain_agent",
+      "domain": "support",
+      "purpose": "Menangani intake, triage, status, dan handoff kebutuhan dukungan pelanggan.",
+      "primary_inputs": [
+        "customer_request",
+        "conversation_context",
+        "service_policy"
+      ],
+      "primary_outputs": [
+        "triage_result",
+        "response_draft",
+        "escalation_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "email-inbox-triage",
+        "grounded-citations"
+      ],
+      "tools": [
+        "ticket_triage",
+        "approval_queue",
+        "knowledge_read"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/support"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Domain catalog; tidak membuat proses agent baru.",
+      "runtime_owner_reason": "Shared hermes-lead orchestrates the domain until product rollout approval."
+    },
+    {
+      "id": "dema-sales",
+      "display_name": "Sales",
+      "kind": "domain_agent",
+      "domain": "sales",
+      "purpose": "Membantu qualification, proposal preparation, follow-up, dan handoff penjualan.",
+      "primary_inputs": [
+        "lead_data",
+        "customer_context",
+        "offer_context"
+      ],
+      "primary_outputs": [
+        "qualification_summary",
+        "proposal_draft",
+        "follow_up_plan"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations"
+      ],
+      "tools": [
+        "lead_triage",
+        "draft_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/sales"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Domain catalog; output eksternal tetap approval-gated.",
+      "runtime_owner_reason": "Shared hermes-lead remains the single owner for this catalog capability."
+    },
+    {
+      "id": "dema-crm",
+      "display_name": "CRM",
+      "kind": "domain_agent",
+      "domain": "crm",
+      "purpose": "Mengelola konteks relasi pelanggan, timeline, segmentation, dan handoff data CRM.",
+      "primary_inputs": [
+        "customer_record",
+        "interaction_history",
+        "consent_context"
+      ],
+      "primary_outputs": [
+        "customer_summary",
+        "next_action",
+        "segment_signal"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "google-workspace",
+        "grounded-citations"
+      ],
+      "tools": [
+        "record_lookup",
+        "segment_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/crm"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Catalog metadata does not grant CRM write access.",
+      "runtime_owner_reason": "Shared hermes-lead owns routing; any tenant data write requires separate approved integration."
+    },
+    {
+      "id": "dema-marketing",
+      "display_name": "Marketing",
+      "kind": "domain_agent",
+      "domain": "marketing",
+      "purpose": "Menyusun campaign brief, audience hypothesis, messaging, dan measurement plan.",
+      "primary_inputs": [
+        "campaign_request",
+        "brand_context",
+        "audience_context"
+      ],
+      "primary_outputs": [
+        "campaign_brief",
+        "message_variants",
+        "measurement_plan"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "humanizer",
+        "grounded-citations"
+      ],
+      "tools": [
+        "brief_builder",
+        "content_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/marketing"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Draft dan recommendation only; publishing membutuhkan approval terpisah.",
+      "runtime_owner_reason": "Shared hermes-lead is the single runtime owner for catalog-only marketing work."
+    },
+    {
+      "id": "dema-social",
+      "display_name": "DEMA Social",
+      "kind": "domain_agent",
+      "domain": "social",
+      "purpose": "Mendukung riset tren, drafting konten sosial, dan approval handoff tanpa posting otomatis.",
+      "primary_inputs": [
+        "social_request",
+        "trend_context",
+        "brand_context"
+      ],
+      "primary_outputs": [
+        "trend_brief",
+        "content_draft",
+        "approval_handoff"
+      ],
+      "runtime_owner": "agent-socmed",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "dema-social-content",
+        "xurl",
+        "grounded-citations"
+      ],
+      "tools": [
+        "trend_research",
+        "draft_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/social"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Alias sumber Social dipetakan eksplisit; posting tetap di luar scope katalog v1.",
+      "runtime_owner_reason": "Existing agent-socmed is the only current runtime owner for the social capability."
+    },
+    {
+      "id": "dema-content",
+      "display_name": "Content",
+      "kind": "domain_agent",
+      "domain": "content",
+      "purpose": "Mengubah brief menjadi content plan, draft, variant, dan editorial handoff.",
+      "primary_inputs": [
+        "content_brief",
+        "brand_context",
+        "channel_constraints"
+      ],
+      "primary_outputs": [
+        "content_plan",
+        "draft_content",
+        "editorial_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "humanizer",
+        "dema-social-content"
+      ],
+      "tools": [
+        "brief_builder",
+        "editorial_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/content"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak menjadwalkan atau menerbitkan konten secara autonomous.",
+      "runtime_owner_reason": "Shared hermes-lead owns this catalog capability until an approved content runtime exists."
+    },
+    {
+      "id": "dema-analyst",
+      "display_name": "Analyst",
+      "kind": "domain_agent",
+      "domain": "analysis",
+      "purpose": "Menyusun analisis terstruktur, evidence summary, metric interpretation, dan decision support.",
+      "primary_inputs": [
+        "question",
+        "structured_data",
+        "source_context"
+      ],
+      "primary_outputs": [
+        "analysis_brief",
+        "evidence_table",
+        "decision_options"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations",
+        "xlsx"
+      ],
+      "tools": [
+        "bounded_analysis",
+        "source_check",
+        "report_builder"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/analysis"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak mengklaim data yang tidak tersedia; unknown tetap eksplisit.",
+      "runtime_owner_reason": "Shared hermes-lead remains the single owner for analysis routing."
+    },
+    {
+      "id": "dema-finance",
+      "display_name": "Finance",
+      "kind": "domain_agent",
+      "domain": "finance",
+      "purpose": "Membantu ringkasan finansial, categorization, variance review, dan approval handoff.",
+      "primary_inputs": [
+        "financial_input",
+        "period_context",
+        "policy_context"
+      ],
+      "primary_outputs": [
+        "finance_summary",
+        "variance_signal",
+        "approval_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "xlsx",
+        "grounded-citations"
+      ],
+      "tools": [
+        "bounded_calculation",
+        "table_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/finance"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak melakukan transfer, pembayaran, atau perubahan ledger dari katalog.",
+      "runtime_owner_reason": "Shared hermes-lead owns orchestration; financial writes require an approved tenant integration."
+    },
+    {
+      "id": "dema-document",
+      "display_name": "Document",
+      "kind": "domain_agent",
+      "domain": "documents",
+      "purpose": "Membantu intake, extraction, classification, drafting, dan review dokumen.",
+      "primary_inputs": [
+        "document_input",
+        "document_request",
+        "policy_context"
+      ],
+      "primary_outputs": [
+        "document_summary",
+        "structured_extract",
+        "review_draft"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "docx",
+        "pdf",
+        "grounded-citations"
+      ],
+      "tools": [
+        "document_read",
+        "structured_extract",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/documents"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Katalog tidak membuka storage atau sharing permission secara otomatis.",
+      "runtime_owner_reason": "Shared hermes-lead is the single runtime owner for document workflows."
+    },
+    {
+      "id": "dema-operations",
+      "display_name": "Operations",
+      "kind": "domain_agent",
+      "domain": "operations",
+      "purpose": "Mengorkestrasi SOP, checklist, exception handling, dan operational handoff.",
+      "primary_inputs": [
+        "operations_request",
+        "sop_context",
+        "status_context"
+      ],
+      "primary_outputs": [
+        "operations_plan",
+        "checklist",
+        "exception_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "mission-control"
+      ],
+      "tools": [
+        "checklist_builder",
+        "status_read",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/operations"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak membuat cron, queue, atau background process dari katalog.",
+      "runtime_owner_reason": "Shared hermes-lead remains the sole runtime owner for operations catalog work."
+    },
+    {
+      "id": "dema-inventory",
+      "display_name": "Inventory",
+      "kind": "domain_agent",
+      "domain": "inventory",
+      "purpose": "Membantu visibility inventory, threshold review, exception detection, dan replenishment handoff.",
+      "primary_inputs": [
+        "inventory_snapshot",
+        "threshold_policy",
+        "demand_context"
+      ],
+      "primary_outputs": [
+        "inventory_summary",
+        "exception_signal",
+        "replenishment_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "xlsx",
+        "grounded-citations"
+      ],
+      "tools": [
+        "inventory_read",
+        "threshold_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/inventory"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Katalog read/recommendation only; tidak menulis stock system.",
+      "runtime_owner_reason": "Shared hermes-lead owns routing until a separately approved inventory integration exists."
+    },
+    {
+      "id": "dema-procurement",
+      "display_name": "Procurement",
+      "kind": "domain_agent",
+      "domain": "procurement",
+      "purpose": "Membantu supplier comparison, purchase request preparation, dan approval handoff.",
+      "primary_inputs": [
+        "purchase_request",
+        "supplier_context",
+        "budget_context"
+      ],
+      "primary_outputs": [
+        "comparison_summary",
+        "purchase_draft",
+        "approval_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "xlsx",
+        "grounded-citations"
+      ],
+      "tools": [
+        "supplier_compare",
+        "draft_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/procurement"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak membuat order atau commit vendor tanpa approval dan integration scope.",
+      "runtime_owner_reason": "Shared hermes-lead is the only runtime owner for procurement catalog capability."
+    },
+    {
+      "id": "dema-hr",
+      "display_name": "HR",
+      "kind": "domain_agent",
+      "domain": "human-resources",
+      "purpose": "Membantu policy lookup, people-ops triage, onboarding checklist, dan handoff sensitif.",
+      "primary_inputs": [
+        "hr_request",
+        "policy_context",
+        "employee_context"
+      ],
+      "primary_outputs": [
+        "hr_summary",
+        "checklist",
+        "escalation_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations",
+        "docx"
+      ],
+      "tools": [
+        "policy_read",
+        "checklist_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/hr"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Sensitive HR actions tetap human-approved dan tenant-scoped.",
+      "runtime_owner_reason": "Shared hermes-lead owns orchestration; no standalone HR process is provisioned."
+    },
+    {
+      "id": "dema-project",
+      "display_name": "Project",
+      "kind": "domain_agent",
+      "domain": "projects",
+      "purpose": "Membantu project brief, milestone synthesis, risk review, dan coordination handoff.",
+      "primary_inputs": [
+        "project_request",
+        "task_context",
+        "stakeholder_context"
+      ],
+      "primary_outputs": [
+        "project_brief",
+        "milestone_summary",
+        "risk_register"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "orchestrated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "mission-control",
+        "grounded-citations"
+      ],
+      "tools": [
+        "task_read",
+        "milestone_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/projects"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Tidak memutasi kanban atau scheduler sebagai bagian dari katalog.",
+      "runtime_owner_reason": "Shared hermes-lead is the sole runtime owner for project catalog work."
+    },
+    {
+      "id": "dema-commerce",
+      "display_name": "Commerce",
+      "kind": "domain_agent",
+      "domain": "commerce",
+      "purpose": "Menyatukan konteks commercial offer, order-related handoff, dan customer transaction support.",
+      "primary_inputs": [
+        "commerce_request",
+        "product_context",
+        "customer_context"
+      ],
+      "primary_outputs": [
+        "commerce_summary",
+        "transaction_handoff",
+        "exception_signal"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-lead",
+      "visibility": "public_catalog",
+      "default_mode": "approval_gated_on_demand",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations",
+        "xlsx"
+      ],
+      "tools": [
+        "catalog_read",
+        "transaction_review",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/business/commerce"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Catalog capability only; payment and order writes remain outside v1.",
+      "runtime_owner_reason": "Shared hermes-lead owns commerce routing until explicit product integration approval."
+    },
+    {
+      "id": "dema-order",
+      "display_name": "Order",
+      "kind": "workflow",
+      "domain": "orders",
+      "purpose": "Workflow untuk intake order, validation, status handoff, dan exception routing tanpa menjadi proses mandiri.",
+      "primary_inputs": [
+        "order_request",
+        "customer_context",
+        "inventory_signal"
+      ],
+      "primary_outputs": [
+        "validated_order_draft",
+        "status_handoff",
+        "exception_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-commerce",
+      "visibility": "public_workflow",
+      "default_mode": "orchestrated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations"
+      ],
+      "tools": [
+        "order_intake",
+        "validation_check",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/orders"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Dipetakan sebagai workflow karena tidak perlu autonomous process tersendiri.",
+      "runtime_owner_reason": "Shared hermes-lead owns the workflow through the commerce capability; no second owner is needed."
+    },
+    {
+      "id": "dema-booking",
+      "display_name": "Booking",
+      "kind": "workflow",
+      "domain": "bookings",
+      "purpose": "Workflow untuk request booking, availability check, confirmation draft, dan reschedule handoff.",
+      "primary_inputs": [
+        "booking_request",
+        "calendar_context",
+        "customer_context"
+      ],
+      "primary_outputs": [
+        "availability_summary",
+        "confirmation_draft",
+        "reschedule_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-operations",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "google-workspace",
+        "grounded-citations"
+      ],
+      "tools": [
+        "availability_read",
+        "confirmation_draft",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/bookings"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow-only; tidak membuat scheduler atau calendar write capability baru.",
+      "runtime_owner_reason": "Shared hermes-lead owns booking orchestration; calendar writes require a separately approved integration."
+    },
+    {
+      "id": "dema-recruiter",
+      "display_name": "Recruiter",
+      "kind": "workflow",
+      "domain": "recruiting",
+      "purpose": "Workflow untuk candidate intake, screening summary, interview coordination, dan handoff.",
+      "primary_inputs": [
+        "candidate_input",
+        "role_context",
+        "hiring_policy"
+      ],
+      "primary_outputs": [
+        "candidate_summary",
+        "interview_handoff",
+        "review_queue"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-hr",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "docx",
+        "grounded-citations"
+      ],
+      "tools": [
+        "candidate_review",
+        "interview_handoff",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/recruiting"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow/sub-capability di bawah HR; keputusan hiring tetap human-owned.",
+      "runtime_owner_reason": "Shared hermes-lead owns routing under the HR catalog entry."
+    },
+    {
+      "id": "dema-meeting",
+      "display_name": "Meeting",
+      "kind": "workflow",
+      "domain": "meetings",
+      "purpose": "Workflow untuk agenda, preparation, notes extraction, decisions, dan action-item handoff.",
+      "primary_inputs": [
+        "meeting_request",
+        "calendar_context",
+        "meeting_notes"
+      ],
+      "primary_outputs": [
+        "agenda",
+        "decision_summary",
+        "action_items"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-project",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "google-workspace",
+        "docx"
+      ],
+      "tools": [
+        "agenda_builder",
+        "note_extract",
+        "action_item_builder"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/meetings"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow-only; tidak menjadi process agent mandiri.",
+      "runtime_owner_reason": "Shared hermes-lead owns meeting workflow through the project capability."
+    },
+    {
+      "id": "dema-email",
+      "display_name": "Email",
+      "kind": "workflow",
+      "domain": "communications",
+      "purpose": "Workflow untuk email triage, draft reply, classification, dan approval handoff.",
+      "primary_inputs": [
+        "email_message",
+        "thread_context",
+        "response_policy"
+      ],
+      "primary_outputs": [
+        "priority_label",
+        "reply_draft",
+        "handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-assistant",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "email-inbox-triage",
+        "humanizer"
+      ],
+      "tools": [
+        "email_read",
+        "reply_draft",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/email"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Draft/read workflow; send action tetap explicit dan approval-gated.",
+      "runtime_owner_reason": "Shared hermes-lead owns email routing; no autonomous sender is created."
+    },
+    {
+      "id": "dema-research",
+      "display_name": "Research",
+      "kind": "workflow",
+      "domain": "research",
+      "purpose": "Workflow untuk source discovery, evidence capture, synthesis, dan citation handoff.",
+      "primary_inputs": [
+        "research_question",
+        "source_constraints",
+        "time_scope"
+      ],
+      "primary_outputs": [
+        "research_brief",
+        "source_list",
+        "cited_synthesis"
+      ],
+      "runtime_owner": "news-agent",
+      "parent": "dema-analyst",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "competitor-news-monitor",
+        "arxiv",
+        "grounded-citations"
+      ],
+      "tools": [
+        "source_search",
+        "citation_check",
+        "brief_builder"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/research"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Mapped to existing news-agent; tidak mengaktifkan jadwal riset baru.",
+      "runtime_owner_reason": "Existing news-agent is the only current runtime owner for research workflow."
+    },
+    {
+      "id": "dema-retention",
+      "display_name": "Retention",
+      "kind": "workflow",
+      "domain": "retention",
+      "purpose": "Workflow untuk identify at-risk customers, summarize signals, dan propose retention actions.",
+      "primary_inputs": [
+        "customer_history",
+        "usage_signal",
+        "retention_policy"
+      ],
+      "primary_outputs": [
+        "risk_summary",
+        "retention_options",
+        "approval_handoff"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-crm",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations"
+      ],
+      "tools": [
+        "signal_review",
+        "option_builder",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/retention"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow/sub-capability CRM; tidak melakukan outreach otomatis.",
+      "runtime_owner_reason": "Shared hermes-lead owns this workflow under CRM until separately approved."
+    },
+    {
+      "id": "dema-review",
+      "display_name": "Review",
+      "kind": "workflow",
+      "domain": "quality-review",
+      "purpose": "Workflow untuk review output, classify issues, suggest revisions, dan record approval state.",
+      "primary_inputs": [
+        "artifact_input",
+        "review_criteria",
+        "source_context"
+      ],
+      "primary_outputs": [
+        "review_findings",
+        "revision_request",
+        "approval_state"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-support",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations",
+        "humanizer"
+      ],
+      "tools": [
+        "artifact_review",
+        "issue_classifier",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/review"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow-only; tidak memberikan final approval secara autonomous.",
+      "runtime_owner_reason": "Shared hermes-lead owns review coordination as the single catalog runtime owner."
+    },
+    {
+      "id": "dema-report",
+      "display_name": "Report",
+      "kind": "workflow",
+      "domain": "reporting",
+      "purpose": "Workflow untuk compile evidence, structure findings, dan menghasilkan report draft yang dapat diverifikasi.",
+      "primary_inputs": [
+        "report_request",
+        "evidence_set",
+        "audience_context"
+      ],
+      "primary_outputs": [
+        "report_draft",
+        "evidence_index",
+        "verification_checklist"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "dema-analyst",
+      "visibility": "public_workflow",
+      "default_mode": "approval_gated_workflow",
+      "provider_model_policy": {
+        "source": "runtime_owner_assignment",
+        "selection": "no_catalog_model_pinning",
+        "fallback": "no_fallback",
+        "execution": "catalog_only_until_approved"
+      },
+      "skills": [
+        "grounded-citations",
+        "docx",
+        "pdf"
+      ],
+      "tools": [
+        "report_builder",
+        "citation_check",
+        "approval_queue"
+      ],
+      "knowledge_scope": [
+        "10-Wiki",
+        "tenant/<tenant_id>/workflow/reporting"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "catalog_only_recommended",
+      "notes": "Workflow/sub-capability Analyst; publikasi membutuhkan approval.",
+      "runtime_owner_reason": "Shared hermes-lead owns reporting orchestration under Analyst."
+    }
+  ]
+}

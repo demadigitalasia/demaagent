@@ -1,0 +1,29 @@
+# Runtime and secret state
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.pid
+*.lock
+.runtime_token_secret
+.env
+.env.*
+*.log
+
+# Python caches and local tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Frontend dependencies and local caches
+frontend/node_modules/
+frontend/.vite/
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
