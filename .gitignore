@@ -9,6 +9,7 @@
 .env
 .env.*
 *.log
+uvicorn-log.json
 
 # Python caches and local tooling
 __pycache__/
