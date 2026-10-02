@@ -86,6 +86,9 @@ class TestContentTeamEndpoint(unittest.TestCase):
         intake_matches = [route for route in self.plugin.router.routes if route.path == "/content-team/intake"]
         self.assertEqual(len(intake_matches), 1)
         self.assertEqual(set(intake_matches[0].methods or set()), {"POST"})
+        review_matches = [route for route in self.plugin.router.routes if route.path == "/content-team/review"]
+        self.assertEqual(len(review_matches), 1)
+        self.assertEqual(set(review_matches[0].methods or set()), {"POST"})
 
     def test_intake_endpoint_returns_bounded_draft_without_external_write(self):
         expected = {
@@ -117,6 +120,44 @@ class TestContentTeamEndpoint(unittest.TestCase):
             response = self.plugin.content_team_intake({"brief": "A normal public brief"})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(json.loads(response.body)["status"], "error")
+
+    def test_review_endpoint_uses_proposal_reviewer_and_keeps_publish_gate_closed(self):
+        expected = {
+            "status": "review_complete",
+            "reviewer_agent_id": "proposal-reviewer",
+            "approval_required": True,
+            "publish_gate": "owner_approval_required",
+            "external_write": False,
+            "autonomous": False,
+            "review": {
+                "overall_status": "needs_revision",
+                "findings": [],
+                "approval_blockers": ["product link"],
+                "review_summary": "Needs revision.",
+            },
+        }
+        with patch.object(self.plugin, "_load_agents", return_value=copy.deepcopy(self.roster)), patch.object(
+            self.plugin._content_review, "review_content_package", return_value=expected
+        ) as review:
+            body = self.plugin.content_team_review({
+                "brief": "Launch a blue linen shirt on Instagram.",
+                "draft": {"normalized_brief": {"channel": "Instagram"}},
+                "evidence": [],
+            })
+        self.assertEqual(body, expected)
+        review.assert_called_once()
+        self.assertEqual(review.call_args.kwargs["reviewer_agent"]["id"], "proposal-reviewer")
+
+    def test_review_endpoint_does_not_fabricate_when_reviewer_missing(self):
+        roster = [row for row in self.roster if row.get("id") != "proposal-reviewer"]
+        with patch.object(self.plugin, "_load_agents", return_value=roster):
+            response = self.plugin.content_team_review({
+                "brief": "A normal public brief",
+                "draft": {"normalized_brief": {}},
+            })
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(json.loads(response.body)["status"], "error")
+
 
 
 if __name__ == "__main__":
