@@ -375,7 +375,7 @@
     }
   ],
   "frozen_runtime_guard": {
-    "count": 11,
+    "count": 14,
     "ids": [
       "hermes-lead",
       "agent-engineer",
@@ -387,7 +387,10 @@
       "document-knowledge",
       "social-research-trends",
       "content-planner-copywriter",
-      "visual-ugc-designer"
+      "visual-ugc-designer",
+      "proposal-strategist",
+      "proposal-reviewer",
+      "content-intake-concierge"
     ],
     "active_flags": {
       "hermes-lead": false,
@@ -400,9 +403,12 @@
       "document-knowledge": false,
       "social-research-trends": false,
       "content-planner-copywriter": false,
-      "visual-ugc-designer": false
+      "visual-ugc-designer": false,
+      "proposal-strategist": false,
+      "proposal-reviewer": false,
+      "content-intake-concierge": false
     },
-    "namespace_count": 6
+    "namespace_count": 8
   },
   "boundary": {
     "catalog_is_not_runtime_count": true,
@@ -955,6 +961,127 @@
       "status": "existing_runtime_frozen",
       "notes": "Current roster entity; catalog metadata does not provision or activate runtime.",
       "runtime_owner_reason": "Current roster metadata is the source of truth; catalog entry is descriptive only."
+    },
+    {
+      "id": "proposal-strategist",
+      "display_name": "Proposal Strategist",
+      "kind": "platform_internal",
+      "domain": "proposal-strategy",
+      "purpose": "On-demand specialist untuk menyusun struktur proposal, positioning, dan strategi respons berbasis brief yang disetujui.",
+      "primary_inputs": [
+        "proposal_brief",
+        "client_context",
+        "approval_boundary"
+      ],
+      "primary_outputs": [
+        "proposal_strategy",
+        "structured_outline",
+        "decision_notes"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_provider_oneshot"
+      },
+      "skills": [
+        "proposal"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/proposal-strategist"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; provider one-shot remains approval-gated and does not activate autonomous runtime.",
+      "runtime_owner_reason": "Current roster metadata assigns this specialist to the Hermes Lead control boundary."
+    },
+    {
+      "id": "proposal-reviewer",
+      "display_name": "Proposal Reviewer",
+      "kind": "platform_internal",
+      "domain": "proposal-review",
+      "purpose": "On-demand reviewer untuk memeriksa kualitas, risiko, kelengkapan bukti, dan kepatuhan proposal sebelum approval.",
+      "primary_inputs": [
+        "proposal_draft",
+        "evidence_pack",
+        "review_criteria"
+      ],
+      "primary_outputs": [
+        "review_findings",
+        "risk_flags",
+        "approval_recommendation"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_provider_oneshot"
+      },
+      "skills": [
+        "proposal",
+        "requesting-code-review"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/proposal-reviewer"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Current roster entity; review output remains advisory until Hermes/user approval.",
+      "runtime_owner_reason": "Current roster metadata assigns this reviewer to the Hermes Lead control boundary."
+    },
+    {
+      "id": "content-intake-concierge",
+      "display_name": "Content Intake Concierge",
+      "kind": "platform_internal",
+      "domain": "content-intake",
+      "purpose": "On-demand concierge untuk menerima, menormalkan, dan menyiapkan brief konten publik tanpa external write.",
+      "primary_inputs": [
+        "content_request",
+        "public_intake_context",
+        "approval_state"
+      ],
+      "primary_outputs": [
+        "normalized_brief",
+        "intake_questions",
+        "handoff_record"
+      ],
+      "runtime_owner": "hermes-lead",
+      "parent": "hermes-lead",
+      "visibility": "platform_internal",
+      "default_mode": "on_demand_specialist",
+      "provider_model_policy": {
+        "source": "current_roster_metadata",
+        "selection": "preserve_literal_provider_model",
+        "fallback": "none",
+        "execution": "bounded_provider_oneshot"
+      },
+      "skills": [
+        "proposal"
+      ],
+      "tools": [],
+      "knowledge_scope": [
+        "10-Wiki",
+        "30-Agents/content-intake-concierge"
+      ],
+      "approval_required": true,
+      "autonomous_allowed": false,
+      "status": "existing_runtime_frozen",
+      "notes": "Roster entity exists with an owner-reconciled Drive workspace; provider one-shot remains approval-gated and does not activate autonomous runtime.",
+      "runtime_owner_reason": "Current roster metadata assigns public intake to the Hermes Lead approval boundary."
     },
     {
       "id": "dema-assistant",

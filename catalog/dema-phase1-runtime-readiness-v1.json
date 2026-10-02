@@ -412,7 +412,7 @@
     "notes": "This recommendation does not create runtime identities and must receive a separate rollout approval before any provisioning decision."
   },
   "frozen_existing_roster_guard": {
-    "count": 11,
+    "count": 14,
     "ids": [
       "hermes-lead",
       "agent-engineer",
@@ -424,20 +424,26 @@
       "document-knowledge",
       "social-research-trends",
       "content-planner-copywriter",
-      "visual-ugc-designer"
+      "visual-ugc-designer",
+      "proposal-strategist",
+      "proposal-reviewer",
+      "content-intake-concierge"
     ],
     "model_assignments": {
       "hermes-lead": "openrouter/openai/gpt-6.1-sol-pro",
-      "agent-engineer": "openai-codex/gpt-5.6-luna",
+      "agent-engineer": "openrouter/openai/gpt-6.1-sol",
       "backend-data": "opencode-go/deepseek-v4-flash",
-      "frontend-product-ui": "openai-codex/gpt-6-luna",
+      "frontend-product-ui": "openrouter/openai/gpt-6.1-sol",
       "devops-sre": "openai-codex/gpt-5.6-luna",
       "personal-assistant": "openai-codex/gpt-5.6-luna",
       "finance-assistant": "openai-codex/gpt-5.6-luna",
       "document-knowledge": "opencode-go/deepseek-v4-flash",
       "social-research-trends": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
       "content-planner-copywriter": "opencode-go/deepseek-v4-flash",
-      "visual-ugc-designer": "opencode-go/deepseek-v4-flash-vision-exp"
+      "visual-ugc-designer": "opencode-go/deepseek-v4-flash-vision-exp",
+      "proposal-strategist": "openrouter/openai/gpt-6.1-sol",
+      "proposal-reviewer": "openrouter/openai/gpt-6.1-sol",
+      "content-intake-concierge": "opencode-go/deepseek-v4-flash"
     },
     "active_flags": {
       "hermes-lead": false,
@@ -450,9 +456,12 @@
       "document-knowledge": false,
       "social-research-trends": false,
       "content-planner-copywriter": false,
-      "visual-ugc-designer": false
+      "visual-ugc-designer": false,
+      "proposal-strategist": false,
+      "proposal-reviewer": false,
+      "content-intake-concierge": false
     },
-    "namespace_count": 6,
+    "namespace_count": 8,
     "status": "guard_only_not_mutated"
   }
 }

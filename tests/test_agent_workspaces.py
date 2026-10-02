@@ -89,8 +89,8 @@ class TestAgentWorkspaceTemporaryVault(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["count"], len(AGENT_IDS))
         self.assertEqual({row["agent_id"] for row in body["workspaces"]}, set(AGENT_IDS))
-        self.assertEqual(body["namespace_readiness"]["ready_count"], 4)
-        self.assertEqual(set(body["namespace_readiness"]["ready_agent_ids"]), set(self.module.OBSIDIAN_APPROVED_NAMESPACE_IDS))
+        self.assertEqual(body["namespace_readiness"]["ready_count"], len(AGENT_IDS))
+        self.assertEqual(set(body["namespace_readiness"]["ready_agent_ids"]), set(AGENT_IDS))
         self.assertTrue(all(row["status"] == "ready" for row in body["workspaces"]))
         status2, detail = response_json(self.module.obsidian_agent_workspace(PRIMARY_AGENT_ID))
         self.assertEqual(status2, 200)
@@ -191,6 +191,8 @@ class TestApprovedNamespaceInitialization(unittest.TestCase):
         "document-knowledge",
         "social-research-trends",
         "content-planner-copywriter",
+        "backend-data",
+        "frontend-product-ui",
     }
 
     @classmethod
@@ -233,18 +235,19 @@ class TestApprovedNamespaceInitialization(unittest.TestCase):
     def test_initialization_is_exact_idempotent_and_does_not_expand_acl_or_touch_core(self):
         first = self.module.initialize_approved_agent_namespaces()
         self.assertEqual(first["status"], "ok")
-        self.assertEqual(set(first["agent_ids"]), self.APPROVED)
-        self.assertEqual(set(first["created_agent_ids"]), self.APPROVED - {"hermes-lead"})
-        self.assertEqual(first["already_ready_agent_ids"], ["hermes-lead"])
+        expected_ids = self.APPROVED | {"agent-engineer"}
+        self.assertEqual(set(first["agent_ids"]), expected_ids)
+        self.assertEqual(set(first["created_agent_ids"]), expected_ids)
+        self.assertEqual(first["already_ready_agent_ids"], [])
         self.assertEqual(first["readback"]["verified"], True)
-        self.assertEqual(self.module._knowledge_agent_ids(), self.APPROVED | {"backend-data", "frontend-product-ui"})
+        self.assertEqual(self.module._knowledge_agent_ids(), self.APPROVED)
 
         folders = {path.name for path in (self.root / "30-Agents").iterdir() if path.is_dir()}
-        self.assertEqual(folders, self.APPROVED | {"agent-engineer"})
-        for agent_id in self.APPROVED - {"hermes-lead"}:
-            marker = self.root / "30-Agents" / agent_id / "README.md"
-            self.assertTrue(marker.is_file())
-            self.assertIn("write_mode: proposal_only", marker.read_text(encoding="utf-8"))
+        self.assertEqual(folders, expected_ids)
+        for agent_id in expected_ids:
+            manifest = json.loads((self.root / "30-Agents" / agent_id / "mission-control-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["agent_id"], agent_id)
+            self.assertEqual(manifest["scope"], f"30-Agents/{agent_id}")
         self.assertEqual(
             (self.root / "30-Agents/hermes-lead/README.md").read_text(encoding="utf-8"),
             "existing approved marker\n",
@@ -259,7 +262,7 @@ class TestApprovedNamespaceInitialization(unittest.TestCase):
         second = self.module.initialize_approved_agent_namespaces()
         self.assertEqual(second["status"], "ok")
         self.assertEqual(second["created_agent_ids"], [])
-        self.assertEqual(second["already_ready_agent_ids"], sorted(self.APPROVED))
+        self.assertEqual(second["already_ready_agent_ids"], sorted(expected_ids))
         self.assertEqual(
             {path: path.read_bytes() for path in (self.root / "30-Agents").rglob("README.md")},
             snapshot,

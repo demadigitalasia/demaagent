@@ -7,6 +7,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
+
 PLUGIN_PATH = Path("/opt/data/plugins/mission-control/dashboard/plugin_api.py")
 _spec = importlib.util.spec_from_file_location("mission_control_plugin_api_workspace_test", PLUGIN_PATH)
 _plugin = importlib.util.module_from_spec(_spec)
@@ -68,6 +69,21 @@ class TestDriveWorkspaceMapping(unittest.TestCase):
         self.assertNotIn(secret, encoded)
         self.assertNotIn("access_token", encoded.lower())
 
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    def test_drive_upload_runs_from_upload_parent_and_passes_relative_media_path(self):
+        upload_dir = Path("/opt/data/cache/scratch")
+        upload_path = upload_dir / "drive-upload-test.txt"
+        upload_path.write_text("projection", encoding="utf-8")
+        fake_proc = type("Proc", (), {"returncode": 0, "stdout": '{"id":"file-1"}', "stderr": ""})()
+        try:
+            with patch.object(_plugin.subprocess, "run", return_value=fake_proc) as run:
+                result = _plugin._drive_command(
+                    ["drive", "files", "create"],
+                    upload=upload_path,
+                    upload_content_type="text/plain",
+                )
+            self.assertEqual(result["id"], "file-1")
+            command = run.call_args.args[0]
+            self.assertEqual(command[command.index("--upload") + 1], upload_path.name)
+            self.assertEqual(run.call_args.kwargs["cwd"], str(upload_dir))
+        finally:
+            upload_path.unlink(missing_ok=True)

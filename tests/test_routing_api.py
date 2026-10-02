@@ -55,13 +55,42 @@ class RoutingApiTests(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(body.get("error"), "unauthorized")
 
+    def test_workflow_group_contract_read_only_and_no_secret(self):
+        client = Client()
+        status, _ = client.login()
+        self.assertEqual(status, 200)
+        status, body = client.request("GET", "/api/routing/workflow-groups")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body.get("status"), "ok")
+        self.assertEqual(body.get("catalog_status"), "configured_read_only_catalog")
+        self.assertFalse(body.get("autonomous_allowed"))
+        self.assertEqual(body.get("provisioning"), "none")
+        self.assertEqual(len(body.get("contracts") or []), 11)
+        encoded = json.dumps(body, ensure_ascii=False).lower()
+        for marker in ("api_key", "access_token", "password", "client_secret", "/opt/data/", "/home/"):
+            self.assertNotIn(marker, encoded)
+        for contract in body["contracts"]:
+            self.assertTrue(contract.get("owner_agent_id"))
+            self.assertTrue(contract.get("workflow_id"))
+            self.assertTrue(contract.get("approval_boundary"))
+
+        status, routing = client.request("GET", "/api/routing")
+        self.assertEqual(status, 200, routing)
+        self.assertEqual(routing["workflow_group_catalog"]["status"], "ok")
+        self.assertEqual(
+            routing["workflow_group_catalog"]["contracts"],
+            body["contracts"],
+        )
+
     def test_routing_read_preview_and_runtime_separation(self):
         client = Client()
         status, _ = client.login()
         self.assertEqual(status, 200)
         status, body = client.request("GET", "/api/routing")
         self.assertEqual(status, 200, body)
-        self.assertEqual(len(body["agents"]), 11)
+        with open("/opt/data/mission-control/agents.json", encoding="utf-8") as handle:
+            roster_count = len(json.load(handle))
+        self.assertEqual(len(body["agents"]), roster_count)
         self.assertEqual(body["runtime"]["runtime_ready"], False)
         self.assertEqual(body["runtime"]["live"], False)
         encoded = json.dumps(body).lower()

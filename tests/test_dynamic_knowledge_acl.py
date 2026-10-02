@@ -84,6 +84,18 @@ class DynamicKnowledgeAclTests(unittest.TestCase):
         self.assertEqual(live["status"], "online")
         self.assertEqual(live["source_status"], "ok")
 
+    def test_agent_live_provider_oneshot_is_configured_but_not_running(self):
+        live = self.plugin._agent_live({
+            "id": "new-specialist",
+            "model": "opencode-go/deepseek-v4-flash",
+            "drive_workspace": {"status": "ready"},
+            "routing": {"runtime_adapter": "provider_oneshot", "runtime_mode": "specialist"},
+        })
+        self.assertEqual(live["status"], "standby")
+        self.assertEqual(live["source_status"], "configured")
+        self.assertEqual(live["runtime_adapter"], "provider_oneshot")
+        self.assertIn("one-shot", live["detail"])
+
     def test_agent_live_unknown_ordinary_agent_stays_explicitly_not_configured(self):
         with patch.object(self.plugin, "_cached", return_value={"agents": {}}):
             live = self.plugin._agent_live({

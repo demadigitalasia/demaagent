@@ -326,11 +326,8 @@ class RuntimeAclTests(unittest.TestCase):
         )
         self.assertEqual(initialized.status_code, 200, initialized.text)
         body = initialized.json()
-        self.assertEqual(
-            set(body["agent_ids"]),
-            {"hermes-lead", "document-knowledge", "social-research-trends", "content-planner-copywriter"},
-        )
-        self.assertEqual(body["readback"]["count"], 4)
+        self.assertEqual(set(body["agent_ids"]), set(AGENT_IDS))
+        self.assertEqual(body["readback"]["count"], len(AGENT_IDS))
         self.assertTrue(body["readback"]["verified"])
         self.assertNotIn("/opt/data/", initialized.text)
         repeated = self.client.post(

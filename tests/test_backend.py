@@ -366,7 +366,88 @@ class TestEndpoints(unittest.TestCase):
         self.assertEqual(st6, 403)
         self.assertIn("executor-only", open_code.get("error", ""))
 
-    def test_roster_workspace_metadata_dan_no_secret(self):
+    def test_context_pack_preview_auth_scope_limits_and_handoff_attachment(self):
+        import urllib.parse
+
+        anon = Client()
+        query = urllib.parse.urlencode({
+            "task_text": "Prepare a bounded Wiki context handoff",
+            "task_id": "api-context-001",
+            "capability_hints": "handoff,context-pack",
+            "max_depth": "2",
+        })
+        st_anon, body_anon = anon.req("GET", f"/api/agents/agent-engineer/context-pack?{query}")
+        self.assertEqual(st_anon, 401)
+        self.assertEqual(body_anon.get("error"), "unauthorized")
+
+        st, body = client.req("GET", f"/api/agents/agent-engineer/context-pack?{query}")
+        self.assertEqual(st, 200, body)
+        self.assertEqual(body.get("status"), "ok")
+        self.assertEqual(body.get("agent_id"), "agent-engineer")
+        self.assertTrue(body.get("bounded"))
+        self.assertTrue(body.get("fingerprint"))
+        self.assertTrue(body.get("retrieval", {}).get("index_first"))
+        self.assertLessEqual(body.get("retrieval", {}).get("max_depth", 99), 2)
+        self.assertIn("source", body.get("classifications", {}))
+        self.assertIn("local", body.get("classifications", {}))
+        self.assertIn("inference", body.get("classifications", {}))
+        self.assertIn("decision", body.get("classifications", {}))
+        paths = {row.get("relative_path") for row in body.get("notes", [])}
+        self.assertTrue(all(path.startswith("10-Wiki/") or path.startswith("30-Agents/agent-engineer/") for path in paths))
+        self.assertNotIn("secret-core", json.dumps(body, ensure_ascii=False))
+        encoded = json.dumps(body, ensure_ascii=False).lower()
+        for marker in ("/opt/data/", "api_key:", "access_token:", "client_secret:", "password:"):
+            self.assertNotIn(marker, encoded, marker)
+
+        st_unknown, body_unknown = client.req("GET", "/api/agents/not-a-roster-agent/context-pack?task_text=handoff")
+        self.assertEqual(st_unknown, 404)
+        self.assertEqual(body_unknown.get("status"), "error")
+        st_bad, body_bad = client.req("GET", f"/api/agents/agent-engineer/context-pack?task_text={urllib.parse.quote('api_key=secret')}")
+        self.assertEqual(st_bad, 400)
+        self.assertEqual(body_bad.get("status"), "error")
+
+        st_missing_csrf, body_missing_csrf = client.req(
+            "POST", "/api/agents/agent-engineer/context-pack",
+            {"task_text": "handoff"}, headers={"X-CSRF-Token": ""},
+        )
+        self.assertEqual(st_missing_csrf, 403)
+        self.assertEqual(body_missing_csrf.get("error"), "csrf_failed")
+        st_wrong_csrf, body_wrong_csrf = client.req(
+            "POST", "/api/agents/agent-engineer/context-pack",
+            {"task_text": "handoff"}, headers={"X-CSRF-Token": "wrong"},
+        )
+        self.assertEqual(st_wrong_csrf, 403)
+        self.assertEqual(body_wrong_csrf.get("error"), "csrf_failed")
+
+        st_post, body_post = client.req(
+            "POST", "/api/agents/agent-engineer/context-pack",
+            {
+                "task_text": "Prepare a bounded Wiki context handoff",
+                "capability_hints": ["handoff", "context-pack"],
+                "task_id": "api-context-001",
+                "max_depth": 2,
+            },
+        )
+        self.assertEqual(st_post, 200, body_post)
+        self.assertEqual(body_post.get("fingerprint"), body.get("fingerprint"))
+
+        st_preview, preview = client.req(
+            "POST", "/api/routing/preview",
+            {"task_text": "Fix the backend API and add tests", "capability_hints": ["engineering-specialist"], "task_id": "route-context-001"},
+        )
+        self.assertEqual(st_preview, 200, preview)
+        self.assertTrue(preview.get("handoff", {}).get("context_pack_attached"))
+        self.assertEqual(preview["handoff"].get("attached_status"), "attached_to_handoff_payload")
+        self.assertTrue(preview["handoff"].get("owner_preview"))
+        self.assertFalse(preview["handoff"].get("runtime_consumed"))
+        handoff_rows = preview["handoff"].get("payloads") or []
+        self.assertTrue(handoff_rows)
+        exact_pack = handoff_rows[0]["input_payload"]["context_pack"]
+        self.assertEqual(exact_pack["task_id"], "route-context-001")
+        self.assertEqual(exact_pack["agent_id"], handoff_rows[0]["agent_id"])
+        self.assertFalse(preview["execution"]["launched"])
+        self.assertFalse(preview["execution"]["external_writes"])
+
         st, body = client.req("GET", "/api/agents/roster")
         self.assertEqual(st, 200)
         agents = body.get("agents") or []
@@ -428,7 +509,31 @@ class TestEndpoints(unittest.TestCase):
         for status in ("online", "running", "standby", "offline", "blocked", "unknown"):
             self.assertIn(status, live)
 
-    def test_agent_workspace_listing_shape(self):
+    def test_drive_workspace_reconcile_owner_auth_csrf_and_dynamic_count(self):
+        anon = Client()
+        st_anon, body_anon = anon.req("POST", "/api/agents/workspaces/reconcile", {})
+        self.assertEqual(st_anon, 401)
+        self.assertEqual(body_anon.get("error"), "unauthorized")
+
+        csrf_client = Client()
+        st_login, _ = csrf_client.login()
+        self.assertEqual(st_login, 200)
+        st_csrf, body_csrf = csrf_client.req(
+            "POST", "/api/agents/workspaces/reconcile", {}, headers={"X-CSRF-Token": "wrong"}
+        )
+        self.assertEqual(st_csrf, 403)
+        self.assertEqual(body_csrf.get("error"), "csrf_failed")
+
+        st, body = client.req("POST", "/api/agents/workspaces/reconcile", {})
+        self.assertIn(st, (200, 503))
+        if st == 200:
+            expected_count = len(json.loads(Path("/opt/data/mission-control/agents.json").read_text(encoding="utf-8")))
+            self.assertEqual(body.get("count"), expected_count)
+            self.assertIn(body.get("status"), ("ready", "partial", "unavailable"))
+            encoded = json.dumps(body, ensure_ascii=False).lower()
+            for marker in ("access_token", "client_secret", "api_key", "password", "/opt/data/"):
+                self.assertNotIn(marker, encoded)
+
         st, roster = client.req("GET", "/api/agents/roster")
         self.assertEqual(st, 200)
         agent = (roster.get("agents") or [])[0]
@@ -541,13 +646,11 @@ class TestAgentRoster(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertEqual(body.get("status"), "ok")
         agents = body.get("agents") or []
-        self.assertEqual(len(agents), 11, "Mission Control current roster harus memuat 11 approved entries")
+        current_roster = json.loads(Path("/opt/data/mission-control/agents.json").read_text(encoding="utf-8"))
+        expected_ids = {row["id"] for row in current_roster}
+        self.assertEqual(len(agents), len(expected_ids), "Mission Control roster harus dibaca dari current roster")
         ids = {a["id"] for a in agents}
-        self.assertEqual(ids, {
-            "hermes-lead", "agent-engineer", "backend-data", "frontend-product-ui", "devops-sre",
-            "personal-assistant", "finance-assistant", "document-knowledge", "social-research-trends",
-            "content-planner-copywriter", "visual-ugc-designer",
-        })
+        self.assertEqual(ids, expected_ids)
         self.assertNotIn("opencode", ids)
         st_mem, memory = client.req("GET", "/api/memory")
         self.assertEqual(st_mem, 200)

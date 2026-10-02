@@ -35,9 +35,25 @@ MAX_RULES = 100
 MAX_LIST = 32
 MAX_STRING = 2000
 APPROVAL_VALUES = {"none", "lead_review", "approval_required", "external_write"}
+AGENT_APPROVAL_VALUES = APPROVAL_VALUES - {"none"}
 AVAILABILITY_VALUES = {"on_demand", "unavailable", "disabled"}
+RUNTIME_MODE_VALUES = {"lead", "planner", "specialist", "assistant", "executor_only"}
+RUNTIME_ADAPTER_VALUES = {"hermes_lead", "agent_engineer", "provider_oneshot", "opencode"}
 METADATA_FILTER_KEYS = frozenset({
     "runtime_mode", "runtime_adapter", "approval_policy", "availability", "parent_id",
+})
+ROUTING_METADATA_FIELDS = frozenset({
+    "capabilities", "tags", "accepts", "outputs", "parent_id", "runtime_owner",
+    "routing_domains", "runtime_mode", "runtime_adapter", "approval_policy", "priority", "availability", "available",
+})
+CONFIG_FIELDS = frozenset({"version", "default_workflow", "routing_rules", "workflows"})
+ROUTING_RULE_FIELDS = frozenset({"id", "capability", "keywords", "priority"})
+WORKFLOW_FIELDS = frozenset({
+    "id", "name", "keywords", "capabilities", "routing_capabilities", "priority", "approval_gates", "stages",
+})
+STAGE_FIELDS = frozenset({
+    "id", "name", "capabilities", "keywords", "exclude_tags", "metadata_filters",
+    "runtime_mode", "routing_domains", "candidate_agent_ids", "depends_on", "approval", "executor_ref", "allow_self_loop",
 })
 
 
@@ -71,6 +87,15 @@ def _check_safe_strings(value: Any) -> None:
             _fail(f"nilai sensitif tidak diizinkan: {path}")
         if ABSOLUTE_PATH_RE.search(text) or PATH_TRAVERSAL_RE.search(text):
             _fail(f"absolute path/path traversal tidak diizinkan: {path}")
+
+
+def _reject_unknown_fields(value: dict, allowed: set[str] | frozenset[str], field: str) -> None:
+    non_string = next((key for key in value if not isinstance(key, str)), None)
+    if non_string is not None:
+        _fail(f"{field} key harus string")
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        _fail(f"{field} field tidak dikenal: {unknown[0]}")
 
 
 def _bounded_string(value: Any, field: str, *, required: bool = True, limit: int = MAX_STRING) -> str:
@@ -145,6 +170,7 @@ def _roster_index(roster: list[dict]) -> tuple[dict[str, dict], set[str]]:
         _fail("roster harus list")
     by_id: dict[str, dict] = {}
     capabilities: set[str] = set()
+    metadata_rows: list[tuple[str, dict | None]] = []
     for index, agent in enumerate(roster):
         if not isinstance(agent, dict):
             _fail(f"roster[{index}] harus object")
@@ -152,18 +178,42 @@ def _roster_index(roster: list[dict]) -> tuple[dict[str, dict], set[str]]:
         if agent_id in by_id:
             _fail(f"ID agent duplikat: {agent_id}")
         by_id[agent_id] = agent
-        metadata = routing_metadata(agent)
-        raw_caps = metadata.get("capabilities", [])
-        if not isinstance(raw_caps, list):
-            _fail(f"routing capabilities tidak valid: {agent_id}")
-        for cap in raw_caps:
-            capabilities.add(_validate_capability(cap, f"agent {agent_id}.capabilities"))
+        raw_routing = agent.get("routing") if "routing" in agent else None
+        raw_legacy = agent.get("routing_metadata") if "routing_metadata" in agent else None
+        if "routing" in agent and raw_routing is not None and not isinstance(raw_routing, dict):
+            _fail(f"routing metadata tidak valid: {agent_id}")
+        if "routing_metadata" in agent and raw_legacy is not None and not isinstance(raw_legacy, dict):
+            _fail(f"routing metadata tidak valid: {agent_id}")
+        if raw_routing is not None and raw_legacy is not None:
+            _fail(f"routing metadata ambigu: {agent_id}")
+        metadata_rows.append((agent_id, raw_routing if raw_routing is not None else raw_legacy))
+    agent_ids = set(by_id)
+    parent_edges: dict[str, str] = {}
+    for agent_id, metadata in metadata_rows:
+        if metadata is None:
+            continue
+        normalized = validate_agent_routing_metadata(metadata, agent_ids)
+        capabilities.update(normalized["capabilities"])
+        parent_id = normalized.get("parent_id")
+        if parent_id == agent_id:
+            _fail(f"routing parent_id self-loop: {agent_id}")
+        if parent_id is not None:
+            parent_edges[agent_id] = parent_id
+    for start in parent_edges:
+        seen: set[str] = set()
+        current: str | None = start
+        while current is not None:
+            if current in seen:
+                _fail(f"routing parent_id cycle terdeteksi: {start}")
+            seen.add(current)
+            current = parent_edges.get(current)
     return by_id, capabilities
 
 
 def _validate_stage(stage: Any, workflow_id: str, stage_ids: set[str], agent_ids: set[str], declared_caps: set[str]) -> dict:
     if not isinstance(stage, dict):
         _fail(f"workflow {workflow_id}: stage harus object")
+    _reject_unknown_fields(stage, STAGE_FIELDS, f"workflow {workflow_id}.stage")
     stage_id = _validate_id(stage.get("id"), f"workflow {workflow_id}.stage.id")
     if stage_id in stage_ids:
         _fail(f"workflow {workflow_id}: stage ID duplikat {stage_id}")
@@ -176,6 +226,10 @@ def _validate_stage(stage: Any, workflow_id: str, stage_ids: set[str], agent_ids
     if unknown_caps:
         _fail(f"stage {stage_id} capability tidak dikenal: {', '.join(unknown_caps[:3])}")
     result["capabilities"] = caps
+    result["routing_domains"] = [
+        _validate_capability(x, f"stage {stage_id}.routing_domains")
+        for x in _bounded_list(stage.get("routing_domains", []), f"stage {stage_id}.routing_domains", limit=16)
+    ]
     result["keywords"] = _bounded_list(stage.get("keywords", []), f"stage {stage_id}.keywords", limit=20)
     result["exclude_tags"] = _bounded_list(stage.get("exclude_tags", []), f"stage {stage_id}.exclude_tags", limit=20)
     metadata_filters = _validate_metadata_filters(
@@ -212,6 +266,7 @@ def validate_config(config: Any, roster: list[dict]) -> dict:
     if not isinstance(config, dict):
         _fail("config harus object")
     _check_safe_strings(config)
+    _reject_unknown_fields(config, CONFIG_FIELDS, "config")
     by_id, roster_caps = _roster_index(roster)
     version = config.get("version", 1)
     if version != 1:
@@ -230,6 +285,7 @@ def validate_config(config: Any, roster: list[dict]) -> dict:
     for rule in rules:
         if not isinstance(rule, dict):
             _fail("routing rule harus object")
+        _reject_unknown_fields(rule, ROUTING_RULE_FIELDS, "routing_rule")
         rule_id = _validate_id(rule.get("id"), "routing_rule.id")
         if rule_id in rule_ids:
             _fail(f"routing rule ID duplikat: {rule_id}")
@@ -255,6 +311,7 @@ def validate_config(config: Any, roster: list[dict]) -> dict:
     for workflow in workflows:
         if not isinstance(workflow, dict):
             _fail("workflow harus object")
+        _reject_unknown_fields(workflow, WORKFLOW_FIELDS, "workflow")
         workflow_id = _validate_id(workflow.get("id"), "workflow.id")
         if workflow_id in workflow_ids:
             _fail(f"workflow ID duplikat: {workflow_id}")
@@ -265,6 +322,20 @@ def validate_config(config: Any, roster: list[dict]) -> dict:
         row["keywords"] = _bounded_list(workflow.get("keywords", []), f"workflow {workflow_id}.keywords", limit=30)
         row["capabilities"] = [_validate_capability(x, f"workflow {workflow_id}.capabilities") for x in _bounded_list(workflow.get("capabilities", []), f"workflow {workflow_id}.capabilities", limit=20)]
         declared_caps.update(row["capabilities"])
+        row["routing_capabilities"] = [
+            _validate_capability(x, f"workflow {workflow_id}.routing_capabilities")
+            for x in _bounded_list(
+                workflow.get("routing_capabilities", row["capabilities"]),
+                f"workflow {workflow_id}.routing_capabilities",
+                limit=20,
+            )
+        ]
+        unknown_routing_caps = sorted(set(row["routing_capabilities"]) - declared_caps)
+        if unknown_routing_caps:
+            _fail(
+                f"workflow {workflow_id} routing capability tidak dikenal: "
+                f"{', '.join(unknown_routing_caps[:3])}"
+            )
         priority = workflow.get("priority", 0)
         if isinstance(priority, bool) or not isinstance(priority, int) or not 0 <= priority <= 1000:
             _fail(f"workflow {workflow_id}.priority tidak valid")
@@ -299,11 +370,16 @@ def validate_agent_routing_metadata(metadata: Any, agent_ids: set[str] | None = 
     if not isinstance(metadata, dict):
         _fail("routing metadata harus object")
     _check_safe_strings(metadata)
+    _reject_unknown_fields(metadata, ROUTING_METADATA_FIELDS, "routing")
     result = copy.deepcopy(metadata)
     for field in ("capabilities", "tags", "accepts", "outputs"):
         result[field] = _bounded_list(metadata.get(field, []), f"routing.{field}", limit=32)
     for capability in result["capabilities"]:
         _validate_capability(capability, "routing.capabilities")
+    result["routing_domains"] = [
+        _validate_capability(x, "routing.routing_domains")
+        for x in _bounded_list(metadata.get("routing_domains", []), "routing.routing_domains", limit=16)
+    ]
     parent_id = metadata.get("parent_id")
     if parent_id is not None:
         parent_id = _validate_id(parent_id, "routing.parent_id")
@@ -314,9 +390,16 @@ def validate_agent_routing_metadata(metadata: Any, agent_ids: set[str] | None = 
     if agent_ids is not None and result["runtime_owner"] not in agent_ids:
         _fail(f"routing.runtime_owner agent tidak dikenal: {result['runtime_owner']}")
     result["runtime_mode"] = _bounded_string(metadata.get("runtime_mode", "specialist"), "routing.runtime_mode", limit=64)
+    if result["runtime_mode"] not in RUNTIME_MODE_VALUES:
+        _fail("routing.runtime_mode tidak valid")
     result["approval_policy"] = _bounded_string(metadata.get("approval_policy", "approval_required"), "routing.approval_policy", limit=64)
-    if result["approval_policy"] not in APPROVAL_VALUES:
+    if result["approval_policy"] not in AGENT_APPROVAL_VALUES:
         _fail("routing.approval_policy tidak valid")
+    if "runtime_adapter" in metadata:
+        adapter = _bounded_string(metadata.get("runtime_adapter"), "routing.runtime_adapter", limit=64)
+        if adapter not in RUNTIME_ADAPTER_VALUES:
+            _fail("routing.runtime_adapter tidak valid")
+        result["runtime_adapter"] = adapter
     priority = metadata.get("priority", 0)
     if isinstance(priority, bool) or not isinstance(priority, int) or not 0 <= priority <= 1000:
         _fail("routing.priority tidak valid")
@@ -324,7 +407,10 @@ def validate_agent_routing_metadata(metadata: Any, agent_ids: set[str] | None = 
     result["availability"] = metadata.get("availability", "on_demand")
     if result["availability"] not in AVAILABILITY_VALUES:
         _fail("routing.availability tidak valid")
-    result["available"] = bool(metadata.get("available", True))
+    available = metadata.get("available", True)
+    if not isinstance(available, bool):
+        _fail("routing.available harus boolean")
+    result["available"] = available
     return result
 
 
@@ -342,6 +428,10 @@ def _agent_candidate(agent: dict, stage: dict) -> tuple[bool, list[str]]:
     candidate_ids = stage.get("candidate_agent_ids") or []
     if candidate_ids and agent.get("id") not in candidate_ids:
         return False, ["not in configured candidate set"]
+    required_domains = set(stage.get("routing_domains") or [])
+    actual_domains = set(metadata.get("routing_domains", [])) if isinstance(metadata.get("routing_domains"), list) else set()
+    if required_domains and not (required_domains & actual_domains):
+        return False, [f"missing routing domain: {', '.join(sorted(required_domains))}"]
     excluded = set(stage.get("exclude_tags", []))
     tags = set(metadata.get("tags", [])) if isinstance(metadata.get("tags"), list) else set()
     if excluded & tags:
@@ -377,14 +467,17 @@ def preview_route(config: dict, roster: list[dict], task_text: str, capability_h
     workflow_scores = []
     rules = normalized.get("routing_rules", [])
     for workflow in normalized["workflows"]:
-        matched_caps = set(hints) & set(workflow.get("capabilities", []))
+        routing_capabilities = set(
+            workflow.get("routing_capabilities", workflow.get("capabilities", []))
+        )
+        matched_caps = set(hints) & routing_capabilities
         matched_keywords = {keyword for keyword in workflow.get("keywords", []) if keyword.casefold() in text}
         matched_rule_ids = []
         rule_score = 0
         for rule in rules:
             rule_keyword_match = any(keyword.casefold() in text for keyword in rule.get("keywords", []))
             rule_hint_match = rule.get("capability") in hints
-            if (rule_keyword_match or rule_hint_match) and rule.get("capability") in workflow.get("capabilities", []):
+            if (rule_keyword_match or rule_hint_match) and rule.get("capability") in routing_capabilities:
                 matched_rule_ids.append(rule["id"])
                 matched_caps.add(rule["capability"])
                 rule_score += int(rule.get("priority", 0))
